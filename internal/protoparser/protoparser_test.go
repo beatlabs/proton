@@ -1,6 +1,7 @@
 package protoparser
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -115,7 +116,7 @@ func Test_HTTPParser(t *testing.T) {
 			test.prepare()
 			parse, err := url.Parse(test.url)
 			assert.NoError(t, err)
-			parser, filename, err := NewHTTP(parse)
+			parser, filename, err := NewHTTP(context.TODO(), parse)
 			test.assert(parser, filename, err)
 		})
 	}
