@@ -1,0 +1,62 @@
+# This is an example goreleaser.yaml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+project_name: proton
+before:
+  hooks:
+    # you may remove this if you don't use vgo
+    - go mod tidy
+builds:
+- goos:
+  - linux
+  - darwin
+  - windows
+  goarch:
+  - amd64
+  - "386"
+  goarm:
+  - "6"
+  # Path to main.go file or main package.
+  main: ./main.go
+  ldflags: -s -w -X github.com/beatlabs/proton/cmd.version=={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+  binary: proton
+archives:
+- name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}'
+  replacements:
+    darwin: Darwin
+    linux: Linux
+    windows: Windows
+    386: i386
+    amd64: x86_64
+snapshot:
+  name_template: SNAPSHOT-{{ .Commit }}
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
+signs:
+-
+  cmd: gpg
+  args:
+  - --output
+  - $signature
+  - --detach-sig
+  - $artifact
+  signature: ${artifact}.sig
+  artifacts: none
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
+release:
+  draft: true
+brews:
+  -
+    github:
+      owner: beatlabs
+      name: proton
+    description: "cli protobuf to json converter"
+    homepage: "https://github.com/beatlabs/proton"
+    folder: Formula
+    install: bin.install "proton"
+    test: |
+      system "#{bin/proton}"
