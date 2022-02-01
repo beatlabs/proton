@@ -20,6 +20,11 @@ import "google/protobuf/timestamp.proto";
 // [END csharp_declaration]
 
 // [START messages]
+// Our address book file is just one of these.
+message AddressBook {
+    repeated Person people = 1;
+}
+
 message Person {
     string name = 1;
     int32 id = 2;  // Unique ID number for this person.
@@ -39,10 +44,5 @@ message Person {
     repeated PhoneNumber phones = 4;
 
     google.protobuf.Timestamp last_updated = 5;
-}
-
-// Our address book file is just one of these.
-message AddressBook {
-    repeated Person people = 1;
 }
 // [END messages]

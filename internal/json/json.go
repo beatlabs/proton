@@ -34,6 +34,13 @@ func (c Converter) Convert(r io.Reader) ([]byte, error) {
 		return nil, err
 	}
 
+	if c.Package == "" {
+		c.Package = fd.GetPackage()
+	}
+	if c.MessageType == "" && len(fd.GetMessageTypes()) > 0 {
+		c.MessageType = fd.GetMessageTypes()[0].GetName()
+	}
+
 	symbol := fd.FindSymbol(fmt.Sprintf("%s.%s", c.Package, c.MessageType))
 	if symbol == nil {
 		return nil, fmt.Errorf("can't find %s in %s package", c.MessageType, c.Package)
