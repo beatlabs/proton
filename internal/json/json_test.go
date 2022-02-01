@@ -2,7 +2,10 @@ package json
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -171,6 +174,76 @@ func Test_Converter(t *testing.T) {
 			test.assert(b, err)
 		})
 	}
+}
+
+func Test_ConvertStream(t *testing.T) {
+	addressBook := genAddressBook()
+	protoBytes, err := proto.Marshal(addressBook)
+	assert.NoError(t, err)
+
+	var b bytes.Buffer
+	b.WriteString(string(protoBytes) + "\n")
+	b.WriteString(DefaultLineSeparator + "\n")
+	b.WriteString(string(protoBytes) + "\n")
+	b.WriteString(DefaultLineSeparator + "\n")
+	b.WriteString(string(protoBytes) + "\n")
+
+	parser, filename, err := protoparser.NewFile("../../testdata/addressbook.proto")
+	assert.NoError(t, err)
+	c := Converter{
+		Parser:   parser,
+		Filename: filename,
+	}
+
+	resultCh, errorCh := c.ConvertStream(strings.NewReader(b.String()))
+
+	var results []string
+	var errors []error
+	for {
+		done := false
+		select {
+		case m, ok := <-resultCh:
+			if !ok {
+				done = true
+				break
+			}
+			results = append(results, string(m))
+		case e, ok := <-errorCh:
+			if !ok {
+				done = true
+				break
+			}
+			_, _ = fmt.Fprintln(os.Stderr, e)
+			errors = append(errors, e)
+		}
+		if done {
+			break
+		}
+	}
+	assert.Empty(t, errors)
+	assert.Len(t, results, 3)
+
+	addressBookAsByte, err := json.MarshalOptions{}.Marshal(addressBook)
+	assert.NoError(t, err)
+	for _, r := range results {
+		assert.JSONEq(t, string(addressBookAsByte), r)
+	}
+}
+
+func Test_ConvertStream_WithInvalidProtoFile(t *testing.T) {
+	parser, filename, err := protoparser.NewFile("../../testdata/not-a-file.proto")
+	assert.NoError(t, err)
+	c := Converter{
+		Parser:   parser,
+		Filename: filename,
+	}
+
+	resultCh, errorCh := c.ConvertStream(strings.NewReader(""))
+	err = <-errorCh
+	res := <-resultCh
+	assert.Error(t, err)
+	assert.Nil(t, res)
+
 }
 
 func genAddressBook() *another_tutorial.AddressBook {

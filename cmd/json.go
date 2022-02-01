@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/url"
 	"os"
@@ -39,17 +38,39 @@ var jsonCmd = &cobra.Command{
 		}
 
 		c := json.Converter{
-			Parser:      protoParser,
-			Filename:    fileName,
-			Package:     pkg,
-			MessageType: messageType,
-			Indent:      indent,
+			Parser:        protoParser,
+			Filename:      fileName,
+			Package:       pkg,
+			MessageType:   messageType,
+			Indent:        indent,
+			LineSeparator: lineSeparator,
 		}
 
-		var r io.Reader
-
 		if isInputFromPipe() {
-			r = os.Stdin
+			r := os.Stdin
+
+			resultCh, errorCh := c.ConvertStream(r)
+			for {
+				done := false
+				select {
+				case m, ok := <-resultCh:
+					if !ok {
+						done = true
+						break
+					}
+					_, _ = fmt.Fprintln(os.Stdout, string(m))
+				case e, ok := <-errorCh:
+					if !ok {
+						done = true
+						break
+					}
+					_, _ = fmt.Fprintln(os.Stderr, e)
+				}
+				if done {
+					break
+				}
+			}
+			return nil
 		} else {
 			if len(args) != 1 {
 				return errors.New("input file path is empty")
@@ -62,17 +83,15 @@ var jsonCmd = &cobra.Command{
 
 			defer file.Close()
 
-			r = file
-		}
+			convert, err := c.Convert(file)
+			if err != nil {
+				return err
+			}
 
-		convert, err := c.Convert(r)
-		if err != nil {
+			_, err = fmt.Fprintln(os.Stdout, string(convert))
+
 			return err
 		}
-
-		_, err = fmt.Fprintln(os.Stdout, string(convert))
-
-		return err
 	},
 }
 
@@ -80,6 +99,7 @@ var indent bool
 var file string
 var pkg string
 var messageType string
+var lineSeparator string
 
 func init() {
 	rootCmd.AddCommand(jsonCmd)
@@ -94,6 +114,8 @@ func init() {
 		"\nDefaults to the package found in the Proton file if not specified")
 	jsonCmd.Flags().StringVarP(&messageType, "type", "t", "", "Proto message type"+
 		"\nDefaults to the first message type in the Proton file if not specified")
+	jsonCmd.Flags().StringVarP(&lineSeparator, "line-separator", "l", "",
+		fmt.Sprintf("Line separator string in case of piping data\nDefaults to %q if not provided", json.DefaultLineSeparator))
 }
 
 func isInputFromPipe() bool {
