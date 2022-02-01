@@ -24,6 +24,39 @@ type Converter struct {
 
 // Convert converts proto message to json.
 func (c Converter) Convert(r io.Reader) ([]byte, error) {
+	md, err := c.createProtoMessageDescriptor()
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	parsed, err := c.parse(md, b)
+	if err != nil {
+		return nil, err
+	}
+	return parsed, nil
+}
+
+func (c Converter) parse(md *desc.MessageDescriptor, rawMessage []byte) ([]byte, error) {
+	dm := dynamic.NewMessage(md)
+	err := dm.Unmarshal(rawMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	json, err := c.marshalJSON(dm)
+	if err != nil {
+		return nil, err
+	}
+
+	return json, nil
+}
+
+func (c Converter) createProtoMessageDescriptor() (*desc.MessageDescriptor, error) {
 	files, err := c.Parser.ParseFiles(c.Filename)
 	if err != nil {
 		return nil, err
@@ -46,25 +79,7 @@ func (c Converter) Convert(r io.Reader) ([]byte, error) {
 		return nil, fmt.Errorf("can't find %s in %s package", c.MessageType, c.Package)
 	}
 
-	md := symbol.(*desc.MessageDescriptor)
-	dm := dynamic.NewMessage(md)
-
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	err = dm.Unmarshal(b)
-	if err != nil {
-		return nil, err
-	}
-
-	json, err := c.marshalJSON(dm)
-	if err != nil {
-		return nil, err
-	}
-
-	return json, nil
+	return symbol.(*desc.MessageDescriptor), nil
 }
 
 func (c Converter) marshalJSON(dm *dynamic.Message) ([]byte, error) {
