@@ -15,35 +15,7 @@ import (
 )
 
 func Test_Converter(t *testing.T) {
-	loc, _ := time.LoadLocation("UTC")
-	d := time.Date(2013, 1, 2, 9, 22, 0, 0, loc)
-	d2 := d.Add(27 * 24 * time.Hour).Add(23 * time.Minute)
-
-	addressBook := &another_tutorial.AddressBook{
-		People: []*another_tutorial.Person{{
-			Name:  "ABC",
-			Id:    1,
-			Email: "abc@thebeat.co",
-			Phones: []*another_tutorial.Person_PhoneNumber{{
-				Number: "123456",
-				Type:   another_tutorial.Person_HOME,
-			}},
-			LastUpdated: &timestamp.Timestamp{
-				Seconds: d.Unix(),
-			},
-		}, {
-			Name:  "DEF",
-			Id:    2,
-			Email: "def@thebeat.co",
-			Phones: []*another_tutorial.Person_PhoneNumber{{
-				Number: "789012",
-				Type:   another_tutorial.Person_HOME,
-			}},
-			LastUpdated: &timestamp.Timestamp{
-				Seconds: d2.Unix(),
-			},
-		}},
-	}
+	addressBook := genAddressBook()
 
 	tests := []struct {
 		name      string
@@ -198,5 +170,37 @@ func Test_Converter(t *testing.T) {
 			b, err := c.Convert(test.message())
 			test.assert(b, err)
 		})
+	}
+}
+
+func genAddressBook() *another_tutorial.AddressBook {
+	loc, _ := time.LoadLocation("UTC")
+	d := time.Date(2013, 1, 2, 9, 22, 0, 0, loc)
+	d2 := d.Add(27 * 24 * time.Hour).Add(23 * time.Minute)
+
+	return &another_tutorial.AddressBook{
+		People: []*another_tutorial.Person{{
+			Name:  "ABC",
+			Id:    1,
+			Email: "abc@thebeat.co",
+			Phones: []*another_tutorial.Person_PhoneNumber{{
+				Number: "123456",
+				Type:   another_tutorial.Person_HOME,
+			}},
+			LastUpdated: &timestamp.Timestamp{
+				Seconds: d.Unix(),
+			},
+		}, {
+			Name:  "DEF",
+			Id:    2,
+			Email: "def@thebeat.co",
+			Phones: []*another_tutorial.Person_PhoneNumber{{
+				Number: "789012",
+				Type:   another_tutorial.Person_HOME,
+			}},
+			LastUpdated: &timestamp.Timestamp{
+				Seconds: d2.Unix(),
+			},
+		}},
 	}
 }
