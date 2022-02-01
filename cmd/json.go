@@ -90,10 +90,10 @@ func init() {
 	if err != nil {
 		log.Fatalf("Failed setting the 'file' flag to required")
 	}
-	jsonCmd.Flags().StringVarP(&pkg, "package", "p", "", "Proto package")
-	jsonCmd.MarkFlagRequired("package")
-	jsonCmd.Flags().StringVarP(&messageType, "type", "t", "", "Proto message type")
-	jsonCmd.MarkFlagRequired("type")
+	jsonCmd.Flags().StringVarP(&pkg, "package", "p", "", "Proto package"+
+		"\nDefaults to the package found in the Proton file if not specified")
+	jsonCmd.Flags().StringVarP(&messageType, "type", "t", "", "Proto message type"+
+		"\nDefaults to the first message type in the Proton file if not specified")
 }
 
 func isInputFromPipe() bool {

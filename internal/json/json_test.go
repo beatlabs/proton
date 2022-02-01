@@ -94,6 +94,52 @@ func Test_Converter(t *testing.T) {
 			},
 		},
 		{
+			name: "No package provided, defaults to package of proto file",
+			converter: func() Converter {
+				parser, filename, _ := protoparser.NewFile("../../testdata/addressbook.proto")
+				return Converter{
+					Parser:      parser,
+					Filename:    filename,
+					MessageType: "AddressBook",
+				}
+			},
+			message: func() io.Reader {
+				protoBytes, err := proto.Marshal(addressBook)
+				assert.NoError(t, err)
+				return bytes.NewReader(protoBytes)
+			},
+			assert: func(bytes []byte, err error) {
+				assert.NotEmpty(t, bytes)
+				assert.NoError(t, err)
+				addressBookAsByte, err := json.Marshal(addressBook)
+				assert.NoError(t, err)
+				assert.JSONEq(t, string(addressBookAsByte), string(bytes))
+			},
+		},
+		{
+			name: "No package provided, defaults to first message type",
+			converter: func() Converter {
+				parser, filename, _ := protoparser.NewFile("../../testdata/addressbook.proto")
+				return Converter{
+					Parser:   parser,
+					Filename: filename,
+					Package:  "tutorial",
+				}
+			},
+			message: func() io.Reader {
+				protoBytes, err := proto.Marshal(addressBook.People[0])
+				assert.NoError(t, err)
+				return bytes.NewReader(protoBytes)
+			},
+			assert: func(bytes []byte, err error) {
+				assert.NotEmpty(t, bytes)
+				assert.NoError(t, err)
+				addressBookAsByte, err := json.Marshal(addressBook.People[0])
+				assert.NoError(t, err)
+				assert.JSONEq(t, string(addressBookAsByte), string(bytes))
+			},
+		},
+		{
 			name: "Parse message",
 			converter: func() Converter {
 				parser, filename, err := protoparser.NewFile("../../testdata/addressbook.proto")
