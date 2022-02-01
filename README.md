@@ -29,30 +29,31 @@ Flags:
   -h, --help             help for json
       --indent           Indent output json
   -p, --package string   Proto package
+                         Defaults to the package found in the Proton file if not specified
   -t, --type string      Proto message type
-
+                         Defaults to the first message type in the Proton file if not specified
 ```
 
 ## Examples
 
 Proto file from URL with input message as argument
 ```shell script
-proton json -f https://raw.githubusercontent.com/protocolbuffers/protobuf/master/examples/addressbook.proto -p tutorial -t AddressBook testdata/out.bin
+proton json -f https://raw.githubusercontent.com/protocolbuffers/protobuf/master/examples/addressbook.proto testdata/out.bin
 ```
 
 Proto file from local with input message as argument
 ```shell script
-proton json -f ./testdata/addressbook.proto -p tutorial -t AddressBook testdata/out.bin
+proton json -f ./testdata/addressbook.proto testdata/out.bin
 ```
 
 Proto file from URL with input message piped
 ```shell script
-cat testdata/out.bin | proton json -f https://raw.githubusercontent.com/protocolbuffers/protobuf/master/examples/addressbook.proto -p tutorial -t AddressBook
+cat testdata/out.bin | proton json -f https://raw.githubusercontent.com/protocolbuffers/protobuf/master/examples/addressbook.proto
 ```
 
 Proto file from local with input message piped
 ```shell script
-cat testdata/out.bin | proton json -f ./testdata/addressbook.proto -p tutorial -t AddressBook
+cat testdata/out.bin | proton json -f ./testdata/addressbook.proto
 ```
 
 

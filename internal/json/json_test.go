@@ -117,7 +117,7 @@ func Test_Converter(t *testing.T) {
 			},
 		},
 		{
-			name: "No package provided, defaults to first message type",
+			name: "No message type provided, defaults to first message type",
 			converter: func() Converter {
 				parser, filename, _ := protoparser.NewFile("../../testdata/addressbook.proto")
 				return Converter{
