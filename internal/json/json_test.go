@@ -127,14 +127,14 @@ func Test_Converter(t *testing.T) {
 				}
 			},
 			message: func() io.Reader {
-				protoBytes, err := proto.Marshal(addressBook.People[0])
+				protoBytes, err := proto.Marshal(addressBook)
 				assert.NoError(t, err)
 				return bytes.NewReader(protoBytes)
 			},
 			assert: func(bytes []byte, err error) {
 				assert.NotEmpty(t, bytes)
 				assert.NoError(t, err)
-				addressBookAsByte, err := json.Marshal(addressBook.People[0])
+				addressBookAsByte, err := json.Marshal(addressBook)
 				assert.NoError(t, err)
 				assert.JSONEq(t, string(addressBookAsByte), string(bytes))
 			},
