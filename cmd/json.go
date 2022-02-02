@@ -38,12 +38,12 @@ var jsonCmd = &cobra.Command{
 		}
 
 		c := json.Converter{
-			Parser:        protoParser,
-			Filename:      fileName,
-			Package:       pkg,
-			MessageType:   messageType,
-			Indent:        indent,
-			LineSeparator: lineSeparator,
+			Parser:             protoParser,
+			Filename:           fileName,
+			Package:            pkg,
+			MessageType:        messageType,
+			Indent:             indent,
+			EndOfMessageMarker: endOfMessageMarker,
 		}
 
 		if isInputFromPipe() {
@@ -99,7 +99,7 @@ var indent bool
 var file string
 var pkg string
 var messageType string
-var lineSeparator string
+var endOfMessageMarker string
 
 func init() {
 	rootCmd.AddCommand(jsonCmd)
@@ -114,8 +114,8 @@ func init() {
 		"\nDefaults to the package found in the Proton file if not specified")
 	jsonCmd.Flags().StringVarP(&messageType, "type", "t", "", "Proto message type"+
 		"\nDefaults to the first message type in the Proton file if not specified")
-	jsonCmd.Flags().StringVarP(&lineSeparator, "line-separator", "l", "",
-		fmt.Sprintf("Line separator string in case of piping data\nDefaults to %q if not provided", json.DefaultLineSeparator))
+	jsonCmd.Flags().StringVarP(&endOfMessageMarker, "end-of-message-marker", "m", "",
+		fmt.Sprintf("Marker for end of message used when piping data\nDefaults to %q if not provided", json.DefaultEndOfMessageMarker))
 }
 
 func isInputFromPipe() bool {

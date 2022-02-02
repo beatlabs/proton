@@ -2,9 +2,7 @@ package json
 
 import (
 	"bytes"
-	"fmt"
 	"io"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -183,9 +181,9 @@ func Test_ConvertStream(t *testing.T) {
 
 	var b bytes.Buffer
 	b.WriteString(string(protoBytes) + "\n")
-	b.WriteString(DefaultLineSeparator + "\n")
+	b.WriteString(DefaultEndOfMessageMarker + "\n")
 	b.WriteString(string(protoBytes) + "\n")
-	b.WriteString(DefaultLineSeparator + "\n")
+	b.WriteString(DefaultEndOfMessageMarker + "\n")
 	b.WriteString(string(protoBytes) + "\n")
 
 	parser, filename, err := protoparser.NewFile("../../testdata/addressbook.proto")
@@ -213,7 +211,6 @@ func Test_ConvertStream(t *testing.T) {
 				done = true
 				break
 			}
-			_, _ = fmt.Fprintln(os.Stderr, e)
 			errors = append(errors, e)
 		}
 		if done {

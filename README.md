@@ -25,16 +25,15 @@ Usage:
   proton json [flags]
 
 Flags:
-  -f, --file string             Proto file path or url
-  -h, --help                    help for json
-      --indent                  Indent output json
-  -l, --line-separator string   Line separator string in case of piping data
-                                Defaults to "--END--" if not provided
-  -p, --package string          Proto package
-                                Defaults to the package found in the Proton file if not specified
-  -t, --type string             Proto message type
-                                Defaults to the first message type in the Proton file if not specified
-
+  -m, --end-of-message-marker string   Marker for end of message used when piping data
+                                       Defaults to "--END--" if not provided
+  -f, --file string                    Proto file path or url
+  -h, --help                           help for json
+      --indent                         Indent output json
+  -p, --package string                 Proto package
+                                       Defaults to the package found in the Proton file if not specified
+  -t, --type string                    Proto message type
+                                       Defaults to the first message type in the Proton file if not specified
 ```
 
 ## Examples
@@ -66,7 +65,7 @@ Multiple proto files from a producer with input messages piped
 
 ### Usage with Kafka consumers
 
-Because Proto bytes can contain newlines (`\n`) and often do, we need to use a different line separator when consuming.
+Because Proto bytes can contain newlines (`\n`) and often do, we need to use a different marker to delimit the end of a message byte-stream and the beginning of the next.
 Proton expects this separator to be on a new line, and expects `--END--` by default.
 
 You can add separators with tool like Kafkacat, like so:
