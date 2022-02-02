@@ -25,13 +25,16 @@ Usage:
   proton json [flags]
 
 Flags:
-  -f, --file string      Proto file path or url
-  -h, --help             help for json
-      --indent           Indent output json
-  -p, --package string   Proto package
-                         Defaults to the package found in the Proton file if not specified
-  -t, --type string      Proto message type
-                         Defaults to the first message type in the Proton file if not specified
+  -f, --file string             Proto file path or url
+  -h, --help                    help for json
+      --indent                  Indent output json
+  -l, --line-separator string   Line separator string in case of piping data
+                                Defaults to "--END--" if not provided
+  -p, --package string          Proto package
+                                Defaults to the package found in the Proton file if not specified
+  -t, --type string             Proto message type
+                                Defaults to the first message type in the Proton file if not specified
+
 ```
 
 ## Examples
@@ -56,4 +59,36 @@ Proto file from local with input message piped
 cat testdata/out.bin | proton json -f ./testdata/addressbook.proto
 ```
 
+Multiple proto files from a producer with input messages piped
+```shell script
+./testdata/producer.sh | proton json -f ./testdata/addressbook.proto
+```
+
+### Usage with Kafka consumers
+
+Because Proto bytes can contain newlines (`\n`) and often do, we need to use a different line separator when consuming.
+Proton expects this separator to be on a new line, and expects `--END--` by default.
+
+You can add separators with tool like Kafkacat, like so:
+
+```shell script
+kcat -b my-broker:9092 -t my-topic -f '%s\n--END--\n'
+```
+
+You can consume messages and parse them with Proton by doing the following:
+
+```shell script
+kcat -b my-broker:9092 -t my-topic -f '%s\n--END--\n' -o beginning | proton json -f ./my-schema.proto
+```
+
+**Don't see messages?**
+
+If you execute the above command, but you don't see messages until you stop the consumer, you might have to adjust your buffer settings:
+You can do this with the `stdbuf` command.
+
+```shell script
+stdbuf -o0 kcat -b my-broker:9092 -t my-topic -f '%s\n--END--\n' -o beginning | proton json -f ./my-schema.proto
+```
+
+If you don't have `stdbuf`, you can install it via `brew install coreutils`.
 
