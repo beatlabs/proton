@@ -51,6 +51,8 @@ func (c Converter) Convert(r io.Reader) ([]byte, error) {
 // It returns a result channel and error channel which both can return multiple messages (a result or error for each message)
 // Because proto messages often contain newlines, we can't rely on new lines for knowing when one message ends and the
 // next begins, so instead it looks for a line containing only a specified LineSeparator (defaults to DefaultLineSeparator).
+// Although unlikely, it is possible that the LineSeparator can be part of the proto binary message, in which case the
+// parsing of that message will fail. If this happens, use a more complex LineSeparator.
 func (c Converter) ConvertStream(r io.Reader) (resultCh chan []byte, errorCh chan error) {
 	resultCh = make(chan []byte)
 	errorCh = make(chan error)
