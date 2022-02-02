@@ -93,11 +93,14 @@ func (c Converter) ConvertStream(r io.Reader) (resultCh chan []byte, errorCh cha
 		}
 
 		// Process whatever is remaining on the read buffer
-		parsed, err := c.unmarshalProtoBytesToJson(md, stripTrailingNewline(buf.Bytes()))
-		if err != nil {
-			errorCh <- err
-		} else {
-			resultCh <- parsed
+		b := stripTrailingNewline(buf.Bytes())
+		if len(b) > 0 {
+			parsed, err := c.unmarshalProtoBytesToJson(md, b)
+			if err != nil {
+				errorCh <- err
+			} else {
+				resultCh <- parsed
+			}
 		}
 		close(resultCh)
 		close(errorCh)
