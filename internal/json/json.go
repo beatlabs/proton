@@ -71,41 +71,19 @@ func (c Converter) ConvertStream(r io.Reader) (resultCh chan []byte, errorCh cha
 	}
 
 	go func() {
-		reader := bufio.NewReader(r)
-		var buf bytes.Buffer
-		for {
-			// Go over the stream line by line, as streams like Kafka send messages on next lines
-			line, err := reader.ReadBytes('\n')
-			if err != nil {
-				if err != io.EOF {
-					errorCh <- err
-				}
-				break
-			}
-			// If the line is equal to c.EndOfMessageMarker (and a newline as reader.ReadBytes does not strip that),
-			// we know the message is finished, so we can start processing it.
-			if bytes.Equal(line, []byte(c.EndOfMessageMarker+"\n")) {
-				parsed, err := c.unmarshalProtoBytesToJson(md, stripTrailingNewline(buf.Bytes()))
-				if err != nil {
-					errorCh <- err
-				} else {
-					resultCh <- parsed
-				}
-				buf.Reset()
-			} else {
-				buf.Write(line)
-			}
-		}
-
-		// Process whatever is remaining on the read buffer
-		b := stripTrailingNewline(buf.Bytes())
-		if len(b) > 0 {
-			parsed, err := c.unmarshalProtoBytesToJson(md, b)
+		scanner := bufio.NewScanner(r)
+		scanner.Split(splitMessagesOnMarker([]byte(c.EndOfMessageMarker)))
+		for scanner.Scan() {
+			rawBytes := scanner.Bytes()
+			parsed, err := c.unmarshalProtoBytesToJson(md, rawBytes)
 			if err != nil {
 				errorCh <- err
 			} else {
 				resultCh <- parsed
 			}
+		}
+		if err := scanner.Err(); err != nil {
+			errorCh <- err
 		}
 		close(resultCh)
 		close(errorCh)
@@ -162,9 +140,26 @@ func (c Converter) marshalJSON(dm *dynamic.Message) ([]byte, error) {
 	return dm.MarshalJSON()
 }
 
-func stripTrailingNewline(b []byte) []byte {
-	if len(b) > 0 && b[len(b)-1] == '\n' {
-		return b[:len(b)-1]
+// splitMessagesOnMarker is a split function for a Scanner that returns each msg
+// in a byte stream stripped of any trailing msgMarker. The returned byte-stream
+// may be empty. The last non-empty byte-slice of input will be returned even if
+// it has no marker.
+func splitMessagesOnMarker(marker []byte) bufio.SplitFunc {
+	return func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		if atEOF && len(data) == 0 {
+			return 0, nil, nil
+		}
+		if len(marker) > 0 {
+			if i := bytes.Index(data, marker); i >= 0 {
+				// We have a full msg.
+				return i + len(marker), data[0:i], nil
+			}
+		}
+		// If we're at EOF, we have a final msg (without marker). Return it.
+		if atEOF {
+			return len(data), data, nil
+		}
+		// Request more data.
+		return 0, nil, nil
 	}
-	return b
 }

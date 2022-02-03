@@ -2,17 +2,16 @@
 
 bytes=`cat $PWD/testdata/out.bin`
 
-echo "$bytes"
-echo "--END--"
+echo -n "$bytes"
+echo -n "--END--"
 sleep 1
 
-echo "$bytes"
-echo "--END--"
+echo -n "$bytes"
+echo -n "--END--"
 sleep 1
 
-echo "$bytes"
-echo "--END--"
+echo -n "$bytes"
+echo -n "--END--"
 sleep 1
 
-echo "$bytes"
-echo "--END--"
+echo -n "$bytes"

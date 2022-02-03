@@ -65,19 +65,20 @@ Multiple proto files from a producer with input messages piped
 
 ### Usage with Kafka consumers
 
-Because Proto bytes can contain newlines (`\n`) and often do, we need to use a different marker to delimit the end of a message byte-stream and the beginning of the next.
-Proton expects this separator to be on a new line, and expects `--END--` by default.
+Because Proto bytes can contain newlines (`\n`) and often do,
+we need to use a different marker to delimit the end of a message byte-stream and the beginning of the next.
+Proton expects an end of message marker, which is `--END--` by default.
 
-You can add separators with tool like Kafkacat, like so:
+You can add markers at the end of each messae with tools like [kafkacat](https://github.com/edenhill/kcat), like so:
 
 ```shell script
-kcat -b my-broker:9092 -t my-topic -f '%s\n--END--\n'
+kcat -b my-broker:9092 -t my-topic -f '%s--END--'
 ```
 
 You can consume messages and parse them with Proton by doing the following:
 
 ```shell script
-kcat -b my-broker:9092 -t my-topic -f '%s\n--END--\n' -o beginning | proton json -f ./my-schema.proto
+kcat -b my-broker:9092 -t my-topic -f '%s--END--' -o beginning | proton json -f ./my-schema.proto
 ```
 
 **Don't see messages?**
@@ -86,7 +87,7 @@ If you execute the above command, but you don't see messages until you stop the 
 You can do this with the `stdbuf` command.
 
 ```shell script
-stdbuf -o0 kcat -b my-broker:9092 -t my-topic -f '%s\n--END--\n' -o beginning | proton json -f ./my-schema.proto
+stdbuf -o0 kcat -b my-broker:9092 -t my-topic -f '%s--END--' -o beginning | proton json -f ./my-schema.proto
 ```
 
 If you don't have `stdbuf`, you can install it via `brew install coreutils`.

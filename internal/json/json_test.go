@@ -180,11 +180,11 @@ func Test_ConvertStream(t *testing.T) {
 	assert.NoError(t, err)
 
 	var b bytes.Buffer
-	b.WriteString(string(protoBytes) + "\n")
-	b.WriteString(DefaultEndOfMessageMarker + "\n")
-	b.WriteString(string(protoBytes) + "\n")
-	b.WriteString(DefaultEndOfMessageMarker + "\n")
-	b.WriteString(string(protoBytes) + "\n")
+	b.WriteString(string(protoBytes))
+	b.WriteString(DefaultEndOfMessageMarker)
+	b.WriteString(string(protoBytes))
+	b.WriteString(DefaultEndOfMessageMarker)
+	b.WriteString(string(protoBytes))
 
 	parser, filename, err := protoparser.NewFile("../../testdata/addressbook.proto")
 	assert.NoError(t, err)
