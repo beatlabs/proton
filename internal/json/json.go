@@ -77,6 +77,9 @@ func (c Converter) ConvertStream(r io.Reader) (resultCh chan []byte, errorCh cha
 			// Go over the stream line by line, as streams like Kafka send messages on next lines
 			line, err := reader.ReadBytes('\n')
 			if err != nil {
+				if err != io.EOF {
+					errorCh <- err
+				}
 				break
 			}
 			// If the line is equal to c.EndOfMessageMarker (and a newline as reader.ReadBytes does not strip that),
