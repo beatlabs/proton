@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/url"
 	"os"
@@ -39,40 +38,52 @@ var jsonCmd = &cobra.Command{
 		}
 
 		c := json.Converter{
-			Parser:      protoParser,
-			Filename:    fileName,
-			Package:     pkg,
-			MessageType: messageType,
-			Indent:      indent,
+			Parser:             protoParser,
+			Filename:           fileName,
+			Package:            pkg,
+			MessageType:        messageType,
+			Indent:             indent,
+			EndOfMessageMarker: endOfMessageMarker,
 		}
 
-		var r io.Reader
-
-		if isInputFromPipe() {
-			r = os.Stdin
-		} else {
+		r := os.Stdin
+		if !isInputFromPipe() {
 			if len(args) != 1 {
 				return errors.New("input file path is empty")
 			}
 
-			file, err := getFile(args[0])
+			r, err = getFile(args[0])
 			if err != nil {
 				return err
 			}
 
-			defer file.Close()
-
-			r = file
+			defer r.Close()
 		}
 
-		convert, err := c.Convert(r)
-		if err != nil {
-			return err
+		resultCh, errorCh := c.ConvertStream(r)
+		var lastError error
+		for {
+			done := false
+			select {
+			case m, ok := <-resultCh:
+				if !ok {
+					done = true
+					break
+				}
+				_, _ = fmt.Fprintln(os.Stdout, string(m))
+			case e, ok := <-errorCh:
+				if !ok {
+					done = true
+					break
+				}
+				lastError = e
+				_, _ = fmt.Fprintln(os.Stderr, e)
+			}
+			if done {
+				break
+			}
 		}
-
-		_, err = fmt.Fprintln(os.Stdout, string(convert))
-
-		return err
+		return lastError
 	},
 }
 
@@ -80,6 +91,7 @@ var indent bool
 var file string
 var pkg string
 var messageType string
+var endOfMessageMarker string
 
 func init() {
 	rootCmd.AddCommand(jsonCmd)
@@ -94,6 +106,8 @@ func init() {
 		"\nDefaults to the package found in the Proton file if not specified")
 	jsonCmd.Flags().StringVarP(&messageType, "type", "t", "", "Proto message type"+
 		"\nDefaults to the first message type in the Proton file if not specified")
+	jsonCmd.Flags().StringVarP(&endOfMessageMarker, "end-of-message-marker", "m", "",
+		"Marker for end of message used when piping data")
 }
 
 func isInputFromPipe() bool {

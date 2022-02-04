@@ -1,9 +1,10 @@
 package json
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -20,10 +21,53 @@ type Converter struct {
 	Filename             string
 	Package, MessageType string
 	Indent               bool
+	EndOfMessageMarker   string
 }
 
-// Convert converts proto message to json.
-func (c Converter) Convert(r io.Reader) ([]byte, error) {
+// ConvertStream converts multiple proto messages to json.
+// It returns a result channel and error channel which both can return multiple messages (a result or error for each message)
+// Because proto messages often contain newlines, we can't rely on new lines for knowing when one message ends and the
+// next begins, so instead it looks for a line containing only a specified marker (defaults to DefaultEndOfMessageMarker).
+// Although unlikely, it is possible that the EndOfMessageMarker can be part of the proto binary message, in which case the
+// parsing of that message will fail. If this happens, use a more complex EndOfMessageMarker.
+func (c Converter) ConvertStream(r io.Reader) (resultCh chan []byte, errorCh chan error) {
+	resultCh = make(chan []byte)
+	errorCh = make(chan error)
+
+	md, err := c.createProtoMessageDescriptor()
+	if err != nil {
+		go func() {
+			errorCh <- err
+			close(resultCh)
+			close(errorCh)
+		}()
+		return
+	}
+
+	go func() {
+		scanner := bufio.NewScanner(r)
+		// Don't set an initial buffer, as the default scanner doesn't do so either
+		scanner.Buffer(nil, 1024*1024)
+		scanner.Split(splitMessagesOnMarker([]byte(c.EndOfMessageMarker)))
+		for scanner.Scan() {
+			rawBytes := scanner.Bytes()
+			parsed, err := c.unmarshalProtoBytesToJson(md, rawBytes)
+			if err != nil {
+				errorCh <- err
+			} else {
+				resultCh <- parsed
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			errorCh <- err
+		}
+		close(resultCh)
+		close(errorCh)
+	}()
+	return
+}
+
+func (c Converter) createProtoMessageDescriptor() (*desc.MessageDescriptor, error) {
 	files, err := c.Parser.ParseFiles(c.Filename)
 	if err != nil {
 		return nil, err
@@ -46,15 +90,12 @@ func (c Converter) Convert(r io.Reader) ([]byte, error) {
 		return nil, fmt.Errorf("can't find %s in %s package", c.MessageType, c.Package)
 	}
 
-	md := symbol.(*desc.MessageDescriptor)
+	return symbol.(*desc.MessageDescriptor), nil
+}
+
+func (c Converter) unmarshalProtoBytesToJson(md *desc.MessageDescriptor, rawMessage []byte) ([]byte, error) {
 	dm := dynamic.NewMessage(md)
-
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	err = dm.Unmarshal(b)
+	err := dm.Unmarshal(rawMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -73,4 +114,28 @@ func (c Converter) marshalJSON(dm *dynamic.Message) ([]byte, error) {
 	}
 
 	return dm.MarshalJSON()
+}
+
+// splitMessagesOnMarker is a split function for a Scanner that returns each msg
+// in a byte stream stripped of any trailing msgMarker. The returned byte-stream
+// may be empty. The last non-empty byte-slice of input will be returned even if
+// it has no marker.
+func splitMessagesOnMarker(marker []byte) bufio.SplitFunc {
+	return func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		if atEOF && len(data) == 0 {
+			return 0, nil, nil
+		}
+		if len(marker) > 0 {
+			if i := bytes.Index(data, marker); i >= 0 {
+				// We have a full msg.
+				return i + len(marker), data[0:i], nil
+			}
+		}
+		// If we're at EOF, we have a final msg (without marker). Return it.
+		if atEOF {
+			return len(data), data, nil
+		}
+		// Request more data.
+		return 0, nil, nil
+	}
 }
