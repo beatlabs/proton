@@ -33,9 +33,9 @@ func Test_ConvertStream(t *testing.T) {
 		EndOfMessageMarker: marker,
 	}
 
-	addressBookAsJsonByte, err := json.MarshalOptions{}.Marshal(addressBook)
+	addressBookAsJSONBytes, err := json.MarshalOptions{}.Marshal(addressBook)
 	assert.NoError(t, err)
-	addressBookAsIndentedJsonByte, err := json.MarshalOptions{Indent: " "}.Marshal(addressBook)
+	addressBookAsIndentedJSONBytes, err := json.MarshalOptions{Indent: " "}.Marshal(addressBook)
 	assert.NoError(t, err)
 
 	tests := []struct {
@@ -86,7 +86,7 @@ func Test_ConvertStream(t *testing.T) {
 				return strings.NewReader(string(protoBytes))
 			},
 			results: [][]byte{
-				addressBookAsJsonByte,
+				addressBookAsJSONBytes,
 			},
 		},
 		{
@@ -100,7 +100,7 @@ func Test_ConvertStream(t *testing.T) {
 				return strings.NewReader(string(protoBytes))
 			},
 			results: [][]byte{
-				addressBookAsJsonByte,
+				addressBookAsJSONBytes,
 			},
 		},
 		{
@@ -116,9 +116,9 @@ func Test_ConvertStream(t *testing.T) {
 				return strings.NewReader(b.String())
 			},
 			results: [][]byte{
-				addressBookAsJsonByte,
-				addressBookAsJsonByte,
-				addressBookAsJsonByte,
+				addressBookAsJSONBytes,
+				addressBookAsJSONBytes,
+				addressBookAsJSONBytes,
 			},
 		},
 		{
@@ -131,8 +131,8 @@ func Test_ConvertStream(t *testing.T) {
 				return strings.NewReader(b.String())
 			},
 			results: [][]byte{
-				addressBookAsJsonByte,
-				addressBookAsJsonByte,
+				addressBookAsJSONBytes,
+				addressBookAsJSONBytes,
 			},
 		},
 		{
@@ -143,7 +143,7 @@ func Test_ConvertStream(t *testing.T) {
 				return strings.NewReader(b.String())
 			},
 			results: [][]byte{
-				addressBookAsJsonByte,
+				addressBookAsJSONBytes,
 			},
 		},
 		{
@@ -159,7 +159,7 @@ func Test_ConvertStream(t *testing.T) {
 				return strings.NewReader(b.String())
 			},
 			results: [][]byte{
-				addressBookAsIndentedJsonByte,
+				addressBookAsIndentedJSONBytes,
 			},
 		},
 		{
@@ -174,8 +174,8 @@ func Test_ConvertStream(t *testing.T) {
 				return strings.NewReader(b.String())
 			},
 			results: [][]byte{
-				addressBookAsJsonByte,
-				addressBookAsJsonByte,
+				addressBookAsJSONBytes,
+				addressBookAsJSONBytes,
 			},
 			errors: []error{
 				errors.New("unexpected EOF"),
