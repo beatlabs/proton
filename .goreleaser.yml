@@ -51,7 +51,7 @@ release:
   draft: true
 brews:
   -
-    github:
+    tap:
       owner: beatlabs
       name: proton
     description: "cli protobuf to json converter"
