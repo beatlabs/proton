@@ -115,7 +115,7 @@ func init() {
 	jsonCmd.Flags().StringVarP(&messageType, "type", "t", "", "Proto message type"+
 		"\nDefaults to the first message type in the Proton file if not specified")
 	jsonCmd.Flags().StringVarP(&endOfMessageMarker, "end-of-message-marker", "m", "",
-		fmt.Sprintf("Marker for end of message used when piping data\nDefaults to %q if not provided", json.DefaultEndOfMessageMarker))
+		"Marker for end of message used when piping data")
 }
 
 func isInputFromPipe() bool {

@@ -1,17 +1,19 @@
 #!/bin/bash
 
+arg=$1
+
 bytes=`cat $PWD/testdata/out.bin`
 
 echo -n "$bytes"
-echo -n "--END--"
+echo -n "${arg}"
 sleep 1
 
 echo -n "$bytes"
-echo -n "--END--"
+echo -n "${arg}"
 sleep 1
 
 echo -n "$bytes"
-echo -n "--END--"
+echo -n "${arg}"
 sleep 1
 
 echo -n "$bytes"

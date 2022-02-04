@@ -11,9 +11,6 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 )
 
-// DefaultEndOfMessageMarker is the default marker that is used when converting streams, unless otherwise specified.
-const DefaultEndOfMessageMarker = "--END--"
-
 // ProtoParser defines the interface for parsing proto files dynamically.
 type ProtoParser interface {
 	ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error)
@@ -56,9 +53,6 @@ func (c Converter) Convert(r io.Reader) ([]byte, error) {
 func (c Converter) ConvertStream(r io.Reader) (resultCh chan []byte, errorCh chan error) {
 	resultCh = make(chan []byte)
 	errorCh = make(chan error)
-	if c.EndOfMessageMarker == "" {
-		c.EndOfMessageMarker = DefaultEndOfMessageMarker
-	}
 
 	md, err := c.createProtoMessageDescriptor()
 	if err != nil {

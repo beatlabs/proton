@@ -18,6 +18,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const marker = "--END--"
+
 func Test_Converter(t *testing.T) {
 	addressBook := genAddressBook()
 
@@ -182,25 +184,95 @@ func Test_ConvertStream(t *testing.T) {
 	protoBytes, err := proto.Marshal(addressBook)
 	assert.NoError(t, err)
 
+	addressBookProtoParser, addressBookFilename, err := protoparser.NewFile("../../testdata/addressbook.proto")
+	assert.NoError(t, err)
+
+	defaultConverter := &Converter{
+		Parser:             addressBookProtoParser,
+		Filename:           addressBookFilename,
+		EndOfMessageMarker: marker,
+	}
+
 	addressBookAsJsonByte, err := json.MarshalOptions{}.Marshal(addressBook)
+	assert.NoError(t, err)
+	addressBookAsIndentedJsonByte, err := json.MarshalOptions{Indent: " "}.Marshal(addressBook)
 	assert.NoError(t, err)
 
 	tests := []struct {
-		name    string
-		input   func() *strings.Reader
-		results [][]byte
-		errors  []error
+		name      string
+		input     func() *strings.Reader
+		converter *Converter
+		results   [][]byte
+		errors    []error
 	}{
+		{
+			name: "Wrong package",
+			converter: &Converter{
+				Parser:      addressBookProtoParser,
+				Filename:    addressBookFilename,
+				Package:     "tutorial2",
+				MessageType: "AddressBook",
+			},
+			input: func() *strings.Reader {
+				return strings.NewReader("")
+			},
+			errors: []error{
+				errors.New("can't find AddressBook in tutorial2 package"),
+			},
+		},
+		{
+			name: "Wrong type",
+			converter: &Converter{
+				Parser:      addressBookProtoParser,
+				Filename:    addressBookFilename,
+				Package:     "tutorial",
+				MessageType: "AddressBook2",
+			},
+			input: func() *strings.Reader {
+				return strings.NewReader("")
+			},
+			errors: []error{
+				errors.New("can't find AddressBook2 in tutorial package"),
+			},
+		},
+		{
+			name: "No package provided, defaults to package of proto file",
+			converter: &Converter{
+				Parser:      addressBookProtoParser,
+				Filename:    addressBookFilename,
+				MessageType: "AddressBook",
+			},
+			input: func() *strings.Reader {
+				return strings.NewReader(string(protoBytes))
+			},
+			results: [][]byte{
+				addressBookAsJsonByte,
+			},
+		},
+		{
+			name: "No message type provided, defaults to first message type",
+			converter: &Converter{
+				Parser:   addressBookProtoParser,
+				Filename: addressBookFilename,
+				Package:  "tutorial",
+			},
+			input: func() *strings.Reader {
+				return strings.NewReader(string(protoBytes))
+			},
+			results: [][]byte{
+				addressBookAsJsonByte,
+			},
+		},
 		{
 			name: "three addressbook messages",
 			input: func() *strings.Reader {
 				var b bytes.Buffer
 				b.WriteString(string(protoBytes))
-				b.WriteString(DefaultEndOfMessageMarker)
+				b.WriteString(marker)
 				b.WriteString(string(protoBytes))
-				b.WriteString(DefaultEndOfMessageMarker)
+				b.WriteString(marker)
 				b.WriteString(string(protoBytes))
-				b.WriteString(DefaultEndOfMessageMarker)
+				b.WriteString(marker)
 				return strings.NewReader(b.String())
 			},
 			results: [][]byte{
@@ -214,7 +286,7 @@ func Test_ConvertStream(t *testing.T) {
 			input: func() *strings.Reader {
 				var b bytes.Buffer
 				b.WriteString(string(protoBytes))
-				b.WriteString(DefaultEndOfMessageMarker)
+				b.WriteString(marker)
 				b.WriteString(string(protoBytes))
 				return strings.NewReader(b.String())
 			},
@@ -235,13 +307,29 @@ func Test_ConvertStream(t *testing.T) {
 			},
 		},
 		{
+			name: "single addressbook message with indent",
+			converter: &Converter{
+				Parser:   addressBookProtoParser,
+				Filename: addressBookFilename,
+				Indent:   true,
+			},
+			input: func() *strings.Reader {
+				var b bytes.Buffer
+				b.WriteString(string(protoBytes))
+				return strings.NewReader(b.String())
+			},
+			results: [][]byte{
+				addressBookAsIndentedJsonByte,
+			},
+		},
+		{
 			name: "invalid first message doesn't stop processing",
 			input: func() *strings.Reader {
 				var b bytes.Buffer
 				b.WriteString("\n")
-				b.WriteString(DefaultEndOfMessageMarker)
+				b.WriteString(marker)
 				b.WriteString(string(protoBytes))
-				b.WriteString(DefaultEndOfMessageMarker)
+				b.WriteString(marker)
 				b.WriteString(string(protoBytes))
 				return strings.NewReader(b.String())
 			},
@@ -257,11 +345,10 @@ func Test_ConvertStream(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			parser, filename, err := protoparser.NewFile("../../testdata/addressbook.proto")
-			assert.NoError(t, err)
-			c := Converter{
-				Parser:   parser,
-				Filename: filename,
+
+			c := defaultConverter
+			if test.converter != nil {
+				c = test.converter
 			}
 			resultCh, errorCh := c.ConvertStream(test.input())
 
@@ -328,10 +415,10 @@ func TestSplitting(t *testing.T) {
 			expectedMsgs: [][]byte{},
 		},
 		"empty marker returns original input": {
-			input:  appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte("#marker#"), []byte{4, 5, '\n', 6, 7, 'p'}),
+			input:  appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte{4, 5, '\n', 6, 7, 'p'}),
 			marker: []byte{},
 			expectedMsgs: [][]byte{
-				appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte("#marker#"), []byte{4, 5, '\n', 6, 7, 'p'}),
+				{1, 2, '\n', 3, 4, '\r', 4, 5, '\n', 6, 7, 'p'},
 			},
 		},
 		"missing end marker": {
