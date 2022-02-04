@@ -3,6 +3,7 @@ package json
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"io"
 	"reflect"
 	"strings"
@@ -181,51 +182,121 @@ func Test_ConvertStream(t *testing.T) {
 	protoBytes, err := proto.Marshal(addressBook)
 	assert.NoError(t, err)
 
-	var b bytes.Buffer
-	b.WriteString(string(protoBytes))
-	b.WriteString(DefaultEndOfMessageMarker)
-	b.WriteString(string(protoBytes))
-	b.WriteString(DefaultEndOfMessageMarker)
-	b.WriteString(string(protoBytes))
-
-	parser, filename, err := protoparser.NewFile("../../testdata/addressbook.proto")
+	addressBookAsJsonByte, err := json.MarshalOptions{}.Marshal(addressBook)
 	assert.NoError(t, err)
-	c := Converter{
-		Parser:   parser,
-		Filename: filename,
+
+	tests := []struct {
+		name    string
+		input   func() *strings.Reader
+		results [][]byte
+		errors  []error
+	}{
+		{
+			name: "three addressbook messages",
+			input: func() *strings.Reader {
+				var b bytes.Buffer
+				b.WriteString(string(protoBytes))
+				b.WriteString(DefaultEndOfMessageMarker)
+				b.WriteString(string(protoBytes))
+				b.WriteString(DefaultEndOfMessageMarker)
+				b.WriteString(string(protoBytes))
+				b.WriteString(DefaultEndOfMessageMarker)
+				return strings.NewReader(b.String())
+			},
+			results: [][]byte{
+				addressBookAsJsonByte,
+				addressBookAsJsonByte,
+				addressBookAsJsonByte,
+			},
+		},
+		{
+			name: "addressbook messages without last marker",
+			input: func() *strings.Reader {
+				var b bytes.Buffer
+				b.WriteString(string(protoBytes))
+				b.WriteString(DefaultEndOfMessageMarker)
+				b.WriteString(string(protoBytes))
+				return strings.NewReader(b.String())
+			},
+			results: [][]byte{
+				addressBookAsJsonByte,
+				addressBookAsJsonByte,
+			},
+		},
+		{
+			name: "single addressbook message",
+			input: func() *strings.Reader {
+				var b bytes.Buffer
+				b.WriteString(string(protoBytes))
+				return strings.NewReader(b.String())
+			},
+			results: [][]byte{
+				addressBookAsJsonByte,
+			},
+		},
+		{
+			name: "invalid first message doesn't stop processing",
+			input: func() *strings.Reader {
+				var b bytes.Buffer
+				b.WriteString("\n")
+				b.WriteString(DefaultEndOfMessageMarker)
+				b.WriteString(string(protoBytes))
+				b.WriteString(DefaultEndOfMessageMarker)
+				b.WriteString(string(protoBytes))
+				return strings.NewReader(b.String())
+			},
+			results: [][]byte{
+				addressBookAsJsonByte,
+				addressBookAsJsonByte,
+			},
+			errors: []error{
+				errors.New("unexpected EOF"),
+			},
+		},
 	}
 
-	resultCh, errorCh := c.ConvertStream(strings.NewReader(b.String()))
-
-	var results []string
-	var errors []error
-	for {
-		done := false
-		select {
-		case m, ok := <-resultCh:
-			if !ok {
-				done = true
-				break
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			parser, filename, err := protoparser.NewFile("../../testdata/addressbook.proto")
+			assert.NoError(t, err)
+			c := Converter{
+				Parser:   parser,
+				Filename: filename,
 			}
-			results = append(results, string(m))
-		case e, ok := <-errorCh:
-			if !ok {
-				done = true
-				break
-			}
-			errors = append(errors, e)
-		}
-		if done {
-			break
-		}
-	}
-	assert.Empty(t, errors)
-	assert.Len(t, results, 3)
+			resultCh, errorCh := c.ConvertStream(test.input())
 
-	addressBookAsByte, err := json.MarshalOptions{}.Marshal(addressBook)
-	assert.NoError(t, err)
-	for _, r := range results {
-		assert.JSONEq(t, string(addressBookAsByte), r)
+			var results []string
+			var errors []error
+			for {
+				done := false
+				select {
+				case m, ok := <-resultCh:
+					if !ok {
+						done = true
+						break
+					}
+					results = append(results, string(m))
+				case e, ok := <-errorCh:
+					if !ok {
+						done = true
+						break
+					}
+					errors = append(errors, e)
+				}
+				if done {
+					break
+				}
+			}
+
+			assert.Equal(t, len(test.results), len(results))
+			for i, r := range results {
+				assert.JSONEq(t, string(test.results[i]), r)
+			}
+			assert.Equal(t, len(test.errors), len(errors))
+			for i, e := range errors {
+				assert.EqualError(t, e, test.errors[i].Error())
+			}
+		})
 	}
 }
 
