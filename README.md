@@ -1,6 +1,6 @@
 # proton
 
-#### cli protobuf to json converter.
+#### CLI protobuf to json converter.
 
 ## Installation
 
