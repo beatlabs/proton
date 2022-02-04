@@ -1,0 +1,32 @@
+name: Release
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types:
+      - labeled
+
+jobs:
+  release-check:
+    # This job only checks the release version and posts a comment on the PR. It does not create a new tag.
+    # Its triggered whenever someone adds a label to a PR.
+    name: Calculate release version
+    if: github.event.action == 'labeled'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # Post bumpr status comment
+      - uses: haya14busa/action-bumpr@v1
+
+  release:
+    # This job creates a tag when a PR is merged.
+    name: Release new version
+    if: github.event.action != 'labeled'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - id: bumpr
+        uses: haya14busa/action-bumpr@v1
+        with:
+          default_bump_level: patch
