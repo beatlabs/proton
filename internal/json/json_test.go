@@ -1,8 +1,10 @@
 package json
 
 import (
+	"bufio"
 	"bytes"
 	"io"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -243,6 +245,84 @@ func Test_ConvertStream_WithInvalidProtoFile(t *testing.T) {
 
 }
 
+func TestSplitting(t *testing.T) {
+	tests := map[string]struct {
+		input        []byte
+		marker       []byte
+		expectedMsgs [][]byte
+	}{
+		"empty": {
+			input:        []byte{},
+			marker:       []byte{},
+			expectedMsgs: [][]byte{},
+		},
+		"empty marker returns original input": {
+			input:  appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte("#marker#"), []byte{4, 5, '\n', 6, 7, 'p'}),
+			marker: []byte{},
+			expectedMsgs: [][]byte{
+				appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte("#marker#"), []byte{4, 5, '\n', 6, 7, 'p'}),
+			},
+		},
+		"missing end marker": {
+			input:  appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte("#marker#"), []byte{4, 5, '\n', 6, 7, 'p'}),
+			marker: []byte("#marker#"),
+			expectedMsgs: [][]byte{
+				{1, 2, '\n', 3, 4, '\r'}, //msg1
+				{4, 5, '\n', 6, 7, 'p'},  //msg2
+			},
+		},
+		"with end marker": {
+			input:  appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte("#marker#"), []byte{4, 5, '\n', 6, 7, 'p'}, []byte("#marker#")),
+			marker: []byte("#marker#"),
+			expectedMsgs: [][]byte{
+				{1, 2, '\n', 3, 4, '\r'},
+				{4, 5, '\n', 6, 7, 'p'},
+			},
+		},
+		"with incomplete marker": {
+			input:  appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte("#marker#"), []byte{4, 5, '\n', 6, 7, 'p'}, []byte("#marker")),
+			marker: []byte("#marker#"),
+			expectedMsgs: [][]byte{
+				{1, 2, '\n', 3, 4, '\r'},
+				appendSlices([]byte{4, 5, '\n', 6, 7, 'p'}, []byte("#marker")),
+			},
+		},
+		"three msgs ": {
+			input: appendSlices(
+				[]byte{1, 2, '\n', 3, 4, '\r'},     //msg1
+				[]byte("--END--"),                  // marker
+				[]byte{4, 5, '\n', 7, 'p'},         //msg2
+				[]byte("--END--"),                  // marker
+				[]byte{4, 5, '\n', 6, 7, 8, 9, 10}, //msg2
+				[]byte("--END--"),                  // marker
+			), //marker
+			marker: []byte("--END--"),
+			expectedMsgs: [][]byte{
+				{1, 2, '\n', 3, 4, '\r'},
+				{4, 5, '\n', 7, 'p'},
+				{4, 5, '\n', 6, 7, 8, 9, 10},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := bufio.NewReader(bytes.NewReader(tt.input))
+			s := bufio.NewScanner(r)
+			s.Split(splitMessagesOnMarker(tt.marker))
+			msgs := make([][]byte, 0)
+			for s.Scan() {
+				msgs = append(msgs, s.Bytes())
+			}
+			if err := s.Err(); err != nil {
+				t.Errorf("Scan() error = %v", err)
+			}
+			if !reflect.DeepEqual(msgs, tt.expectedMsgs) {
+				t.Errorf("Scan() = %v, want %v", msgs, tt.expectedMsgs)
+			}
+		})
+	}
+}
+
 func genAddressBook() *another_tutorial.AddressBook {
 	loc, _ := time.LoadLocation("UTC")
 	d := time.Date(2013, 1, 2, 9, 22, 0, 0, loc)
@@ -273,4 +353,12 @@ func genAddressBook() *another_tutorial.AddressBook {
 			},
 		}},
 	}
+}
+
+func appendSlices(ss ...[]byte) []byte {
+	res := []byte{}
+	for _, s := range ss {
+		res = append(res, s...)
+	}
+	return res
 }
