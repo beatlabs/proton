@@ -46,52 +46,44 @@ var jsonCmd = &cobra.Command{
 			EndOfMessageMarker: endOfMessageMarker,
 		}
 
-		if isInputFromPipe() {
-			r := os.Stdin
-
-			resultCh, errorCh := c.ConvertStream(r)
-			for {
-				done := false
-				select {
-				case m, ok := <-resultCh:
-					if !ok {
-						done = true
-						break
-					}
-					_, _ = fmt.Fprintln(os.Stdout, string(m))
-				case e, ok := <-errorCh:
-					if !ok {
-						done = true
-						break
-					}
-					_, _ = fmt.Fprintln(os.Stderr, e)
-				}
-				if done {
-					break
-				}
-			}
-			return nil
-		} else {
+		r := os.Stdin
+		if !isInputFromPipe() {
 			if len(args) != 1 {
 				return errors.New("input file path is empty")
 			}
 
-			file, err := getFile(args[0])
+			r, err = getFile(args[0])
 			if err != nil {
 				return err
 			}
 
-			defer file.Close()
-
-			convert, err := c.Convert(file)
-			if err != nil {
-				return err
-			}
-
-			_, err = fmt.Fprintln(os.Stdout, string(convert))
-
-			return err
+			defer r.Close()
 		}
+
+		resultCh, errorCh := c.ConvertStream(r)
+		var lastError error
+		for {
+			done := false
+			select {
+			case m, ok := <-resultCh:
+				if !ok {
+					done = true
+					break
+				}
+				_, _ = fmt.Fprintln(os.Stdout, string(m))
+			case e, ok := <-errorCh:
+				if !ok {
+					done = true
+					break
+				}
+				lastError = e
+				_, _ = fmt.Fprintln(os.Stderr, e)
+			}
+			if done {
+				break
+			}
+		}
+		return lastError
 	},
 }
 

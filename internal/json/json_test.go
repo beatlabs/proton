@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -19,165 +18,6 @@ import (
 )
 
 const marker = "--END--"
-
-func Test_Converter(t *testing.T) {
-	addressBook := genAddressBook()
-
-	tests := []struct {
-		name      string
-		converter func() Converter
-		message   func() io.Reader
-		assert    func([]byte, error)
-	}{
-		{
-			name: "Wrong package",
-			converter: func() Converter {
-				parser, filename, _ := protoparser.NewFile("../../testdata/addressbook.proto")
-
-				return Converter{
-					Parser:      parser,
-					Filename:    filename,
-					Package:     "tutorial2",
-					MessageType: "AddressBook",
-				}
-			},
-			message: func() io.Reader {
-				return nil
-			},
-			assert: func(bytes []byte, err error) {
-				assert.Empty(t, bytes)
-				assert.Error(t, err)
-				assert.EqualError(t, err, "can't find AddressBook in tutorial2 package")
-			},
-		},
-		{
-			name: "Wrong type",
-			converter: func() Converter {
-				parser, filename, _ := protoparser.NewFile("../../testdata/addressbook.proto")
-
-				return Converter{
-					Parser:      parser,
-					Filename:    filename,
-					Package:     "tutorial",
-					MessageType: "AddressBook2",
-				}
-			},
-			message: func() io.Reader {
-				return nil
-			},
-			assert: func(bytes []byte, err error) {
-				assert.Empty(t, bytes)
-				assert.Error(t, err)
-				assert.EqualError(t, err, "can't find AddressBook2 in tutorial package")
-			},
-		},
-		{
-			name: "No package provided, defaults to package of proto file",
-			converter: func() Converter {
-				parser, filename, _ := protoparser.NewFile("../../testdata/addressbook.proto")
-				return Converter{
-					Parser:      parser,
-					Filename:    filename,
-					MessageType: "AddressBook",
-				}
-			},
-			message: func() io.Reader {
-				protoBytes, err := proto.Marshal(addressBook)
-				assert.NoError(t, err)
-				return bytes.NewReader(protoBytes)
-			},
-			assert: func(bytes []byte, err error) {
-				assert.NotEmpty(t, bytes)
-				assert.NoError(t, err)
-				addressBookAsByte, err := json.Marshal(addressBook)
-				assert.NoError(t, err)
-				assert.JSONEq(t, string(addressBookAsByte), string(bytes))
-			},
-		},
-		{
-			name: "No message type provided, defaults to first message type",
-			converter: func() Converter {
-				parser, filename, _ := protoparser.NewFile("../../testdata/addressbook.proto")
-				return Converter{
-					Parser:   parser,
-					Filename: filename,
-					Package:  "tutorial",
-				}
-			},
-			message: func() io.Reader {
-				protoBytes, err := proto.Marshal(addressBook)
-				assert.NoError(t, err)
-				return bytes.NewReader(protoBytes)
-			},
-			assert: func(bytes []byte, err error) {
-				assert.NotEmpty(t, bytes)
-				assert.NoError(t, err)
-				addressBookAsByte, err := json.Marshal(addressBook)
-				assert.NoError(t, err)
-				assert.JSONEq(t, string(addressBookAsByte), string(bytes))
-			},
-		},
-		{
-			name: "Parse message",
-			converter: func() Converter {
-				parser, filename, err := protoparser.NewFile("../../testdata/addressbook.proto")
-				assert.NoError(t, err)
-				return Converter{
-					Parser:      parser,
-					Filename:    filename,
-					Package:     "tutorial",
-					MessageType: "AddressBook",
-				}
-			},
-			message: func() io.Reader {
-				protoBytes, err := proto.Marshal(addressBook)
-				assert.NoError(t, err)
-				return bytes.NewReader(protoBytes)
-			},
-			assert: func(bytes []byte, err error) {
-				assert.NotEmpty(t, bytes)
-				assert.NoError(t, err)
-				addressBookAsByte, err := json.Marshal(addressBook)
-				assert.NoError(t, err)
-				assert.JSONEq(t, string(addressBookAsByte), string(bytes))
-			},
-		},
-		{
-			name: "Parse message with indent",
-			converter: func() Converter {
-				parser, filename, err := protoparser.NewFile("../../testdata/addressbook.proto")
-				assert.NoError(t, err)
-				return Converter{
-					Parser:      parser,
-					Filename:    filename,
-					Package:     "tutorial",
-					MessageType: "AddressBook",
-					Indent:      true,
-				}
-			},
-			message: func() io.Reader {
-				protoBytes, err := proto.Marshal(addressBook)
-				assert.NoError(t, err)
-				return bytes.NewReader(protoBytes)
-			},
-			assert: func(bytes []byte, err error) {
-				assert.NotEmpty(t, bytes)
-				assert.NoError(t, err)
-				marshaller := json.MarshalOptions{Indent: " "}
-				addressBookAsByte, err := marshaller.Marshal(addressBook)
-				assert.NoError(t, err)
-				assert.JSONEq(t, string(addressBookAsByte), string(bytes))
-			},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			c := test.converter()
-			b, err := c.Convert(test.message())
-			test.assert(b, err)
-		})
-	}
-}
 
 func Test_ConvertStream(t *testing.T) {
 	addressBook := genAddressBook()
@@ -339,6 +179,19 @@ func Test_ConvertStream(t *testing.T) {
 			},
 			errors: []error{
 				errors.New("unexpected EOF"),
+			},
+		},
+		{
+			name: "single long message",
+			input: func() *strings.Reader {
+				var b bytes.Buffer
+				for i := 0; i < 1000000; i++ {
+					b.WriteString(string(protoBytes))
+				}
+				return strings.NewReader(b.String())
+			},
+			errors: []error{
+				errors.New("bufio.Scanner: token too long"),
 			},
 		},
 	}

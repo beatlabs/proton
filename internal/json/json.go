@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -23,25 +22,6 @@ type Converter struct {
 	Package, MessageType string
 	Indent               bool
 	EndOfMessageMarker   string
-}
-
-// Convert converts proto message to json.
-func (c Converter) Convert(r io.Reader) ([]byte, error) {
-	md, err := c.createProtoMessageDescriptor()
-	if err != nil {
-		return nil, err
-	}
-
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	parsed, err := c.unmarshalProtoBytesToJson(md, b)
-	if err != nil {
-		return nil, err
-	}
-	return parsed, nil
 }
 
 // ConvertStream converts multiple proto messages to json.
@@ -66,6 +46,8 @@ func (c Converter) ConvertStream(r io.Reader) (resultCh chan []byte, errorCh cha
 
 	go func() {
 		scanner := bufio.NewScanner(r)
+		// Don't set an initial buffer, as the default scanner doesn't do so either
+		scanner.Buffer(nil, 1024*1024)
 		scanner.Split(splitMessagesOnMarker([]byte(c.EndOfMessageMarker)))
 		for scanner.Scan() {
 			rawBytes := scanner.Bytes()
