@@ -51,7 +51,7 @@ func (c Converter) ConvertStream(r io.Reader) (resultCh chan []byte, errorCh cha
 		scanner.Split(splitMessagesOnMarker([]byte(c.EndOfMessageMarker)))
 		for scanner.Scan() {
 			rawBytes := scanner.Bytes()
-			parsed, err := c.unmarshalProtoBytesToJson(md, rawBytes)
+			parsed, err := c.unmarshalProtoBytesToJSON(md, rawBytes)
 			if err != nil {
 				errorCh <- err
 			} else {
@@ -93,7 +93,7 @@ func (c Converter) createProtoMessageDescriptor() (*desc.MessageDescriptor, erro
 	return symbol.(*desc.MessageDescriptor), nil
 }
 
-func (c Converter) unmarshalProtoBytesToJson(md *desc.MessageDescriptor, rawMessage []byte) ([]byte, error) {
+func (c Converter) unmarshalProtoBytesToJSON(md *desc.MessageDescriptor, rawMessage []byte) ([]byte, error) {
 	dm := dynamic.NewMessage(md)
 	err := dm.Unmarshal(rawMessage)
 	if err != nil {
