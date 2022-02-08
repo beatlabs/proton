@@ -5,12 +5,12 @@
 class Proton < Formula
   desc "cli protobuf to json converter"
   homepage "https://github.com/beatlabs/proton"
-  version "2.0.0"
+  version "2.0.1"
 
   on_macos do
     if Hardware::CPU.intel?
-      url "https://github.com/beatlabs/proton/releases/download/v2.0.0/proton_Darwin_x86_64.tar.gz"
-      sha256 "170de7d4af647cd6ad019a41f908271a65d1a66187b7df50b516bbd257582d8e"
+      url "https://github.com/beatlabs/proton/releases/download/v2.0.1/proton_Darwin_x86_64.tar.gz"
+      sha256 "c4a4bf8b47ce78288439513b8f01d3adcb4f3d0bcdbea8b817f53dbdf1f9d656"
 
       def install
         bin.install "proton"
@@ -20,8 +20,8 @@ class Proton < Formula
 
   on_linux do
     if Hardware::CPU.intel?
-      url "https://github.com/beatlabs/proton/releases/download/v2.0.0/proton_Linux_x86_64.tar.gz"
-      sha256 "706a50122c6d27e0ee983ad8c8704483da20f96132df427baad3aa56c2dd844d"
+      url "https://github.com/beatlabs/proton/releases/download/v2.0.1/proton_Linux_x86_64.tar.gz"
+      sha256 "106c4dc24c98b677d142892437232c24893eefa32b02d1a5c82fcc32aacf8a11"
 
       def install
         bin.install "proton"
