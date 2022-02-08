@@ -10,7 +10,7 @@ class Proton < Formula
   on_macos do
     if Hardware::CPU.intel?
       url "https://github.com/beatlabs/proton/releases/download/v2.0.1/proton_Darwin_x86_64.tar.gz"
-      sha256 "c4a4bf8b47ce78288439513b8f01d3adcb4f3d0bcdbea8b817f53dbdf1f9d656"
+      sha256 "7213d6394b8e5def43a84615c0c4c46f945aca905a8a2af63fdf9a9813edfc6f"
 
       def install
         bin.install "proton"
@@ -21,7 +21,7 @@ class Proton < Formula
   on_linux do
     if Hardware::CPU.intel?
       url "https://github.com/beatlabs/proton/releases/download/v2.0.1/proton_Linux_x86_64.tar.gz"
-      sha256 "106c4dc24c98b677d142892437232c24893eefa32b02d1a5c82fcc32aacf8a11"
+      sha256 "5e917e5d22c75dd6362eea013023d353258a52aa5fd55351029abed245d144b9"
 
       def install
         bin.install "proton"
