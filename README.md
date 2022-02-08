@@ -7,7 +7,7 @@
 Execute:
 
 ```bash
-$ go get github.com/beatlabs/proton
+$ go install github.com/beatlabs/proton/v2@latest
 ```
 Or download from [Releases](https://github.com/beatlabs/proton/releases)
 
