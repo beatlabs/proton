@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/beatlabs/proton/internal/json"
-	"github.com/beatlabs/proton/internal/protoparser"
+	"github.com/beatlabs/proton/v2/internal/json"
+	"github.com/beatlabs/proton/v2/internal/protoparser"
 	"github.com/spf13/cobra"
 )
 

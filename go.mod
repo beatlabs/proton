@@ -1,4 +1,4 @@
-module github.com/beatlabs/proton
+module github.com/beatlabs/proton/v2
 
 go 1.15
 

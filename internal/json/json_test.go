@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/beatlabs/proton/internal/protoparser"
-	another_tutorial "github.com/beatlabs/proton/testdata"
+	"github.com/beatlabs/proton/v2/internal/protoparser"
+	another_tutorial "github.com/beatlabs/proton/v2/testdata"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/stretchr/testify/assert"
 	json "google.golang.org/protobuf/encoding/protojson"
