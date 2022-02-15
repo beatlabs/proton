@@ -17,7 +17,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const marker = "--END--"
+var startMarker = []byte("--START--")
+var endMarker = []byte("--END--")
 
 func Test_ConvertStream(t *testing.T) {
 	addressBook := genAddressBook()
@@ -28,21 +29,26 @@ func Test_ConvertStream(t *testing.T) {
 	assert.NoError(t, err)
 
 	defaultConverter := &Converter{
-		Parser:             addressBookProtoParser,
-		Filename:           addressBookFilename,
-		EndOfMessageMarker: marker,
+		Parser:               addressBookProtoParser,
+		Filename:             addressBookFilename,
+		StartOfMessageMarker: startMarker,
+		EndOfMessageMarker:   endMarker,
 	}
 
 	addressBookAsJSONBytes, err := json.MarshalOptions{}.Marshal(addressBook)
 	assert.NoError(t, err)
-	addressBookAsIndentedJSONBytes, err := json.MarshalOptions{Indent: " "}.Marshal(addressBook)
+	addressBookAsIndentedJSONBytes, err := json.MarshalOptions{Indent: "	"}.Marshal(addressBook)
 	assert.NoError(t, err)
 
+	type result struct {
+		isJSON bool
+		val    []byte
+	}
 	tests := []struct {
 		name      string
 		input     func() *strings.Reader
 		converter *Converter
-		results   [][]byte
+		results   []result
 		errors    []error
 	}{
 		{
@@ -85,9 +91,10 @@ func Test_ConvertStream(t *testing.T) {
 			input: func() *strings.Reader {
 				return strings.NewReader(string(protoBytes))
 			},
-			results: [][]byte{
-				addressBookAsJSONBytes,
-			},
+			results: []result{{
+				isJSON: true,
+				val:    addressBookAsJSONBytes,
+			}},
 		},
 		{
 			name: "No message type provided, defaults to first message type",
@@ -99,51 +106,103 @@ func Test_ConvertStream(t *testing.T) {
 			input: func() *strings.Reader {
 				return strings.NewReader(string(protoBytes))
 			},
-			results: [][]byte{
-				addressBookAsJSONBytes,
-			},
+			results: []result{{
+				isJSON: true,
+				val:    addressBookAsJSONBytes,
+			}},
 		},
 		{
 			name: "three addressbook messages",
 			input: func() *strings.Reader {
 				var b bytes.Buffer
-				b.WriteString(string(protoBytes))
-				b.WriteString(marker)
-				b.WriteString(string(protoBytes))
-				b.WriteString(marker)
-				b.WriteString(string(protoBytes))
-				b.WriteString(marker)
+				b.Write(startMarker)
+				b.Write(protoBytes)
+				b.Write(endMarker)
+
+				b.Write(startMarker)
+				b.Write(protoBytes)
+				b.Write(endMarker)
+
+				b.Write(startMarker)
+				b.Write(protoBytes)
+				b.Write(endMarker)
+
 				return strings.NewReader(b.String())
 			},
-			results: [][]byte{
-				addressBookAsJSONBytes,
-				addressBookAsJSONBytes,
-				addressBookAsJSONBytes,
+			results: []result{{
+				isJSON: true,
+				val:    addressBookAsJSONBytes,
+			}, {
+				isJSON: true,
+				val:    addressBookAsJSONBytes,
+			}, {
+				isJSON: true,
+				val:    addressBookAsJSONBytes,
+			}},
+		},
+		{
+			name: "three addressbook messages with timestamp and other data",
+			input: func() *strings.Reader {
+				var b bytes.Buffer
+				b.Write([]byte("Hello world"))
+
+				b.Write(startMarker)
+				b.Write(protoBytes)
+				b.Write(endMarker)
+
+				b.Write([]byte("Timestamp: 1234567890"))
+
+				b.Write(startMarker)
+				b.Write(protoBytes)
+				b.Write(endMarker)
+
+				// nothing in-between messages
+
+				b.Write(startMarker)
+				b.Write(protoBytes)
+				b.Write(endMarker)
+
+				b.Write([]byte("Bye world"))
+
+				return strings.NewReader(b.String())
+			},
+			results: []result{
+				{val: []byte("Hello world")},
+				{isJSON: true, val: addressBookAsJSONBytes},
+				{val: []byte("Timestamp: 1234567890")},
+				{isJSON: true, val: addressBookAsJSONBytes},
+				{isJSON: true, val: addressBookAsJSONBytes},
+				{val: []byte("Bye world")},
 			},
 		},
 		{
-			name: "addressbook messages without last marker",
+			// kcat ... -f '{"key": "%k", "timestamp": %T, "value":--START--%s--END--}'
+			name: "consumes json-formatted input",
 			input: func() *strings.Reader {
 				var b bytes.Buffer
-				b.WriteString(string(protoBytes))
-				b.WriteString(marker)
-				b.WriteString(string(protoBytes))
+				b.Write([]byte(`{"key": "gr_12345", "timestamp": 1644882297612, "value":`))
+				b.Write(startMarker)
+				b.Write(protoBytes)
+				b.Write(endMarker)
+				b.Write([]byte("}"))
+
 				return strings.NewReader(b.String())
 			},
-			results: [][]byte{
-				addressBookAsJSONBytes,
-				addressBookAsJSONBytes,
+			results: []result{
+				{val: []byte(`{"key": "gr_12345", "timestamp": 1644882297612, "value":`)},
+				{isJSON: true, val: addressBookAsJSONBytes},
+				{val: []byte("}")},
 			},
 		},
 		{
 			name: "single addressbook message",
 			input: func() *strings.Reader {
 				var b bytes.Buffer
-				b.WriteString(string(protoBytes))
+				b.Write(protoBytes)
 				return strings.NewReader(b.String())
 			},
-			results: [][]byte{
-				addressBookAsJSONBytes,
+			results: []result{
+				{isJSON: true, val: addressBookAsJSONBytes},
 			},
 		},
 		{
@@ -155,43 +214,35 @@ func Test_ConvertStream(t *testing.T) {
 			},
 			input: func() *strings.Reader {
 				var b bytes.Buffer
-				b.WriteString(string(protoBytes))
+				b.Write(protoBytes)
 				return strings.NewReader(b.String())
 			},
-			results: [][]byte{
-				addressBookAsIndentedJSONBytes,
+			results: []result{
+				{isJSON: true, val: addressBookAsIndentedJSONBytes},
 			},
 		},
 		{
 			name: "invalid first message doesn't stop processing",
 			input: func() *strings.Reader {
 				var b bytes.Buffer
-				b.WriteString("\n")
-				b.WriteString(marker)
-				b.WriteString(string(protoBytes))
-				b.WriteString(marker)
-				b.WriteString(string(protoBytes))
+				b.Write(startMarker)
+				b.Write([]byte("qwe"))
+				b.Write(endMarker)
+
+				b.Write(startMarker)
+				b.Write(protoBytes)
+				b.Write(endMarker)
+
+				b.Write(startMarker)
+				b.Write(protoBytes)
+				b.Write(endMarker)
+
 				return strings.NewReader(b.String())
 			},
-			results: [][]byte{
-				addressBookAsJSONBytes,
-				addressBookAsJSONBytes,
-			},
-			errors: []error{
-				errors.New("unexpected EOF"),
-			},
-		},
-		{
-			name: "single long message",
-			input: func() *strings.Reader {
-				var b bytes.Buffer
-				for i := 0; i < 1000000; i++ {
-					b.WriteString(string(protoBytes))
-				}
-				return strings.NewReader(b.String())
-			},
-			errors: []error{
-				errors.New("bufio.Scanner: token too long"),
+			results: []result{
+				{val: []byte("qwe")},
+				{isJSON: true, val: addressBookAsJSONBytes},
+				{isJSON: true, val: addressBookAsJSONBytes},
 			},
 		},
 	}
@@ -229,9 +280,14 @@ func Test_ConvertStream(t *testing.T) {
 			}
 
 			assert.Equal(t, len(test.results), len(results))
-			for i, r := range results {
-				assert.JSONEq(t, string(test.results[i]), r)
+			for i, expected := range test.results {
+				if expected.isJSON {
+					assert.JSONEq(t, string(expected.val), results[i])
+				} else {
+					assert.Equal(t, string(expected.val), results[i])
+				}
 			}
+
 			assert.Equal(t, len(test.errors), len(errors))
 			for i, e := range errors {
 				assert.EqualError(t, e, test.errors[i].Error())
@@ -252,66 +308,77 @@ func Test_ConvertStream_WithInvalidProtoFile(t *testing.T) {
 	err = <-errorCh
 	res := <-resultCh
 	assert.Error(t, err)
-	assert.Nil(t, res)
+	assert.Empty(t, res)
 
 }
 
 func TestSplitting(t *testing.T) {
 	tests := map[string]struct {
 		input        []byte
-		marker       []byte
+		startMarker  []byte
+		endMarker    []byte
 		expectedMsgs [][]byte
 	}{
 		"empty": {
 			input:        []byte{},
-			marker:       []byte{},
+			endMarker:    []byte{},
 			expectedMsgs: [][]byte{},
 		},
-		"empty marker returns original input": {
-			input:  appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte{4, 5, '\n', 6, 7, 'p'}),
-			marker: []byte{},
+		"without markers -> return original input": {
+			input:       appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte{4, 5, '\n', 6, 7, 'p'}),
+			startMarker: []byte("#startMarker#"),
+			endMarker:   []byte("#endMarker#"),
 			expectedMsgs: [][]byte{
 				{1, 2, '\n', 3, 4, '\r', 4, 5, '\n', 6, 7, 'p'},
 			},
 		},
-		"missing end marker": {
-			input:  appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte("#marker#"), []byte{4, 5, '\n', 6, 7, 'p'}),
-			marker: []byte("#marker#"),
-			expectedMsgs: [][]byte{
-				{1, 2, '\n', 3, 4, '\r'}, //msg1
-				{4, 5, '\n', 6, 7, 'p'},  //msg2
-			},
-		},
-		"with end marker": {
-			input:  appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte("#marker#"), []byte{4, 5, '\n', 6, 7, 'p'}, []byte("#marker#")),
-			marker: []byte("#marker#"),
+		"with markers -> split": {
+			input: appendSlices(
+				[]byte("#startMarker#"),
+				[]byte{1, 2, '\n', 3, 4, '\r'},
+				[]byte("#endMarker#"),
+
+				[]byte("#startMarker#"),
+				[]byte{4, 5, '\n', 6, 7, 'p'},
+				[]byte("#endMarker#")),
+			startMarker: []byte("#startMarker#"),
+			endMarker:   []byte("#endMarker#"),
 			expectedMsgs: [][]byte{
 				{1, 2, '\n', 3, 4, '\r'},
 				{4, 5, '\n', 6, 7, 'p'},
 			},
 		},
-		"with incomplete marker": {
-			input:  appendSlices([]byte{1, 2, '\n', 3, 4, '\r'}, []byte("#marker#"), []byte{4, 5, '\n', 6, 7, 'p'}, []byte("#marker")),
-			marker: []byte("#marker#"),
-			expectedMsgs: [][]byte{
-				{1, 2, '\n', 3, 4, '\r'},
-				appendSlices([]byte{4, 5, '\n', 6, 7, 'p'}, []byte("#marker")),
-			},
-		},
-		"three msgs ": {
+		"three msgs with markers and random data": {
 			input: appendSlices(
-				[]byte{1, 2, '\n', 3, 4, '\r'},     //msg1
-				[]byte("--END--"),                  // marker
-				[]byte{4, 5, '\n', 7, 'p'},         //msg2
-				[]byte("--END--"),                  // marker
-				[]byte{4, 5, '\n', 6, 7, 8, 9, 10}, //msg2
-				[]byte("--END--"),                  // marker
-			), //marker
-			marker: []byte("--END--"),
+				[]byte("Hello world"),
+
+				[]byte("--START--"),
+				[]byte{1, 2, '\n', 3, 4, '\r'}, //msg1
+				[]byte("--END--"),
+
+				[]byte("Timestamp: 1234567890"),
+
+				[]byte("--START--"),
+				[]byte{4, 5, '\n', 7, 'p'}, //msg2
+				[]byte("--END--"),
+
+				// no extra data
+
+				[]byte("--START--"),
+				[]byte{4, 5, '\n', 6, 7, 8, 9, 10}, //msg3
+				[]byte("--END--"),
+
+				[]byte("Bye world"),
+			),
+			startMarker: []byte("--START--"),
+			endMarker:   []byte("--END--"),
 			expectedMsgs: [][]byte{
+				[]byte("Hello world"),
 				{1, 2, '\n', 3, 4, '\r'},
+				[]byte("Timestamp: 1234567890"),
 				{4, 5, '\n', 7, 'p'},
 				{4, 5, '\n', 6, 7, 8, 9, 10},
+				[]byte("Bye world"),
 			},
 		},
 	}
@@ -319,7 +386,7 @@ func TestSplitting(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r := bufio.NewReader(bytes.NewReader(tt.input))
 			s := bufio.NewScanner(r)
-			s.Split(splitMessagesOnMarker(tt.marker))
+			s.Split(splitMessagesOnMarkers(tt.startMarker, tt.endMarker))
 			msgs := make([][]byte, 0)
 			for s.Scan() {
 				msgs = append(msgs, s.Bytes())
@@ -367,7 +434,7 @@ func genAddressBook() *another_tutorial.AddressBook {
 }
 
 func appendSlices(ss ...[]byte) []byte {
-	res := []byte{}
+	var res []byte
 	for _, s := range ss {
 		res = append(res, s...)
 	}
