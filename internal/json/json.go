@@ -21,17 +21,18 @@ type Converter struct {
 	Filename             string
 	Package, MessageType string
 	Indent               bool
-	EndOfMessageMarker   string
+	StartOfMessageMarker []byte
+	EndOfMessageMarker   []byte
 }
 
 // ConvertStream converts multiple proto messages to json.
 // It returns a result channel and error channel which both can return multiple messages (a result or error for each message)
 // Because proto messages often contain newlines, we can't rely on new lines for knowing when one message ends and the
-// next begins, so instead it looks for a line containing only a specified marker (defaults to DefaultEndOfMessageMarker).
-// Although unlikely, it is possible that the EndOfMessageMarker can be part of the proto binary message, in which case the
-// parsing of that message will fail. If this happens, use a more complex EndOfMessageMarker.
-func (c Converter) ConvertStream(r io.Reader) (resultCh chan []byte, errorCh chan error) {
-	resultCh = make(chan []byte)
+// next begins, so instead it looks for specified markers of the start and the end.
+// Although unlikely, it is possible that the one the markers can be part of the proto binary message, in which case the
+// parsing of that message will fail. If this happens, use more complex markers.
+func (c Converter) ConvertStream(r io.Reader) (resultCh chan string, errorCh chan error) {
+	resultCh = make(chan string)
 	errorCh = make(chan error)
 
 	md, err := c.createProtoMessageDescriptor()
@@ -48,14 +49,16 @@ func (c Converter) ConvertStream(r io.Reader) (resultCh chan []byte, errorCh cha
 		scanner := bufio.NewScanner(r)
 		// Don't set an initial buffer, as the default scanner doesn't do so either
 		scanner.Buffer(nil, 1024*1024)
-		scanner.Split(splitMessagesOnMarker([]byte(c.EndOfMessageMarker)))
+		scanner.Split(splitMessagesOnMarkers(c.StartOfMessageMarker, c.EndOfMessageMarker))
 		for scanner.Scan() {
 			rawBytes := scanner.Bytes()
 			parsed, err := c.unmarshalProtoBytesToJSON(md, rawBytes)
 			if err != nil {
-				errorCh <- err
+				// can't parse it, just output whatever that is
+				resultCh <- string(rawBytes)
 			} else {
-				resultCh <- parsed
+				// could parse it, proto message, yahoo!
+				resultCh <- string(parsed)
 			}
 		}
 		if err := scanner.Err(); err != nil {
@@ -116,26 +119,71 @@ func (c Converter) marshalJSON(dm *dynamic.Message) ([]byte, error) {
 	return dm.MarshalJSON()
 }
 
-// splitMessagesOnMarker is a split function for a Scanner that returns each msg
-// in a byte stream stripped of any trailing msgMarker. The returned byte-stream
-// may be empty. The last non-empty byte-slice of input will be returned even if
-// it has no marker.
-func splitMessagesOnMarker(marker []byte) bufio.SplitFunc {
+// splitMessagesOnMarkers is a split function for a Scanner that returns each msg
+// in a byte stream stripped of any leading or trailing msgMarker(s).
+// The data between two markers is seen as a chunk of binary data
+// The data outside of START and END is seen as some random data and also just returned.
+// The returned byte-stream may be empty. The last non-empty byte-slice of input will be returned even if
+// it has no endMarker.
+func splitMessagesOnMarkers(startMarker, endMarker []byte) bufio.SplitFunc {
 	return func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-		if atEOF && len(data) == 0 {
+		if isDataEmpty(data, atEOF) {
 			return 0, nil, nil
 		}
-		if len(marker) > 0 {
-			if i := bytes.Index(data, marker); i >= 0 {
-				// We have a full msg.
-				return i + len(marker), data[0:i], nil
+
+		if markersDefined(startMarker, endMarker) {
+			startMarkerLength := len(startMarker)
+			endMarkerLength := len(endMarker)
+
+			// example message:
+			// Hello world --START-- binary awesomeness --END-- Bye world
+
+			startI := bytes.Index(data, startMarker)
+			// if START is not at index 0, then there is some data before binary message
+			if startI > 0 {
+				// we just return that data
+				// example: Hello world
+				return startI, data[0:startI], nil
+			}
+
+			// if START is at index 0, then this is a start of a binary message
+			// example: --START-- binary awesomeness --END-- Bye world
+			if startI == 0 {
+				// find END marker
+				endI := bytes.Index(data, endMarker)
+
+				// if it's found, return everything in between, this is a complete binary message
+				if endI >= 0 {
+					// advance will skip the data until the end of END marker for the next chunk
+					advance := endI + endMarkerLength
+					message := data[startMarkerLength:endI]
+
+					// example: binary awesomeness
+					return advance, message, nil
+				}
+			}
+
+			// if we can't find a START, then there are no more binary messages
+			if startI == -1 {
+				// so simply return what we have left
+				return len(data), data, nil
 			}
 		}
+
 		// If we're at EOF, we have a final msg (without marker). Return it.
 		if atEOF {
 			return len(data), data, nil
 		}
-		// Request more data.
+
+		// if we can't find either of START or END markers, we need more data, we're somewhere in between
 		return 0, nil, nil
 	}
+}
+
+func markersDefined(startMarker []byte, endMarker []byte) bool {
+	return len(startMarker) > 0 && len(endMarker) > 0
+}
+
+func isDataEmpty(data []byte, atEOF bool) bool {
+	return atEOF && len(data) == 0
 }

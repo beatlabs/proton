@@ -38,12 +38,13 @@ var jsonCmd = &cobra.Command{
 		}
 
 		c := json.Converter{
-			Parser:             protoParser,
-			Filename:           fileName,
-			Package:            pkg,
-			MessageType:        messageType,
-			Indent:             indent,
-			EndOfMessageMarker: endOfMessageMarker,
+			Parser:               protoParser,
+			Filename:             fileName,
+			Package:              pkg,
+			MessageType:          messageType,
+			Indent:               indent,
+			StartOfMessageMarker: []byte(startOfMessageMarker),
+			EndOfMessageMarker:   []byte(endOfMessageMarker),
 		}
 
 		r := os.Stdin
@@ -70,7 +71,7 @@ var jsonCmd = &cobra.Command{
 					done = true
 					break
 				}
-				_, _ = fmt.Fprintln(os.Stdout, string(m))
+				_, _ = fmt.Fprint(os.Stdout, m)
 			case e, ok := <-errorCh:
 				if !ok {
 					done = true
@@ -91,6 +92,7 @@ var indent bool
 var file string
 var pkg string
 var messageType string
+var startOfMessageMarker string
 var endOfMessageMarker string
 
 func init() {
@@ -106,8 +108,10 @@ func init() {
 		"\nDefaults to the package found in the Proton file if not specified")
 	jsonCmd.Flags().StringVarP(&messageType, "type", "t", "", "Proto message type"+
 		"\nDefaults to the first message type in the Proton file if not specified")
+	jsonCmd.Flags().StringVarP(&startOfMessageMarker, "start-of-message-marker", "s", "",
+		"\nMarker for the start of a message used when piping data, ignored if end marker is not specified")
 	jsonCmd.Flags().StringVarP(&endOfMessageMarker, "end-of-message-marker", "m", "",
-		"Marker for end of message used when piping data")
+		"\nMarker for the end of a message used when piping data, ignored if start marker is not specified")
 }
 
 func isInputFromPipe() bool {
