@@ -28,6 +28,7 @@ var topic string
 var broker string
 var proto string
 var format string
+var keyGrep string
 var offsets []string
 var startTime, endTime int64
 var verbose bool
@@ -73,6 +74,8 @@ Example:
 	consumeCmd.Flags().StringSliceVarP(&offsets, "offsets", "o", []string{}, "Start and end timestamp offsets")
 	startTime, endTime = parseOffsets(offsets)
 
+	consumeCmd.Flags().StringVarP(&keyGrep, "key", "", ".*", "Grep RegExp for a key value")
+
 	consumeCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Whether to print out proton's debug messages")
 }
 
@@ -108,6 +111,7 @@ func Run(cmd *cobra.Command, _ []string) {
 		Start:   startTime,
 		End:     endTime,
 		Verbose: verbose,
+		KeyGrep: keyGrep,
 	}, &protoDecoder{json.Converter{
 		Parser:   protoParser,
 		Filename: fileName,

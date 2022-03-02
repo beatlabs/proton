@@ -90,6 +90,12 @@ Time: 1646218099197 	 key  {"field1":"value1","field2":"value2"}
 ```
 Run `proton consume -h` to see all the available formatting options.
 
+To filter out keys, you can use `--key <regexp>` option like in this example:
+```shell
+proton consume -b my-broker -t my-topic --proto ./my-schema.proto --key "my-key"
+proton consume -b my-broker -t my-topic --proto ./my-schema.proto --key "my-k.*"
+```
+
 #### Piping from Kafkacat
 
 Because Proto bytes can contain newlines (`\n`) and often do,

@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -17,6 +18,7 @@ type Cfg struct {
 	Topic      string
 	Start, End int64
 	Verbose    bool
+	KeyGrep    string
 }
 
 // Kafka is the consumer itself.
@@ -26,6 +28,7 @@ type Kafka struct {
 	topic   string
 	offsets []offsets
 
+	keyGrep *regexp.Regexp
 	verbose bool
 
 	client sarama.Client
@@ -87,10 +90,16 @@ func NewKafka(ctx context.Context, cfg Cfg, decoder protoparser.Decoder, printer
 		oo = append(oo, offsets{partition: p, start: start, end: end})
 	}
 
+	keyGrep, err := regexp.Compile(cfg.KeyGrep)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Kafka{
 		ctx:     ctx,
 		topic:   topic,
 		offsets: oo,
+		keyGrep: keyGrep,
 		verbose: cfg.Verbose,
 		client:  client,
 		decoder: decoder,
@@ -139,6 +148,10 @@ func (k *Kafka) Run() <-chan error {
 					case <-k.ctx.Done():
 						return
 					case message := <-c.Messages():
+						if !k.keyGrep.Match(message.Key) {
+							continue
+						}
+
 						msg, err := k.decoder.Decode(message.Value)
 						if err == nil {
 							k.printer.Print(output.Msg{
