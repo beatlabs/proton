@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 
 	"github.com/Shopify/sarama"
 	"github.com/beatlabs/proton/v2/internal/consumer"
@@ -24,8 +26,9 @@ var consumeCmd = &cobra.Command{
 
 var topic string
 var broker string
-var model string
+var proto string
 var format string
+var offsets []string
 var startTime, endTime int64
 var verbose bool
 
@@ -42,8 +45,8 @@ func init() {
 		log.Fatal("you must specify a topic to consume using the `-t <topic>` option")
 	}
 
-	consumeCmd.Flags().StringVarP(&model, "model", "m", "", "A path to a proto file an URL to it")
-	if consumeCmd.MarkFlagRequired("model") != nil {
+	consumeCmd.Flags().StringVarP(&proto, "proto", "", "", "A path to a proto file an URL to it")
+	if consumeCmd.MarkFlagRequired("proto") != nil {
 		log.Fatal("you must specify a proto file using the `-m <path>` option")
 	}
 
@@ -67,10 +70,26 @@ Format string tokens:
 Example:
 	-f 'Key: %k, Time: %Tf \nValue: %s'`)
 
-	consumeCmd.Flags().Int64VarP(&startTime, "start", "s", sarama.OffsetOldest, "Start offset timestamp milliseconds")
-	consumeCmd.Flags().Int64VarP(&endTime, "end", "e", sarama.OffsetNewest, "End offset timestamp milliseconds")
+	consumeCmd.Flags().StringSliceVarP(&offsets, "offsets", "o", []string{}, "Start and end timestamp offsets")
+	startTime, endTime = parseOffsets(offsets)
 
 	consumeCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Whether to print out proton's debug messages")
+}
+
+func parseOffsets(offsets []string) (int64, int64) {
+	return parseOffset("s@", offsets, sarama.OffsetOldest), parseOffset("e@", offsets, sarama.OffsetNewest)
+}
+
+func parseOffset(prefix string, offsets []string, defaultVal int64) int64 {
+	for _, offset := range offsets {
+		if strings.HasPrefix(offset, prefix) {
+			v, err := strconv.Atoi(offset[len(prefix):])
+			if err == nil {
+				return int64(v)
+			}
+		}
+	}
+	return defaultVal
 }
 
 // Run runs this whole thing.
@@ -78,7 +97,7 @@ func Run(cmd *cobra.Command, _ []string) {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 
-	protoParser, fileName, err := protoparser.New(ctx, model)
+	protoParser, fileName, err := protoparser.New(ctx, proto)
 	if err != nil {
 		log.Fatal(err)
 	}

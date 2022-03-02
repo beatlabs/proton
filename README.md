@@ -70,19 +70,19 @@ Proton can consume from Kafka directly. The syntax of all the parameters is kept
 
 The minimal configuration to run Proton as a standalone consumer is
 ```shell
-proton consume -b my-broker -t my-topic -m ./my-schema.proto
+proton consume -b my-broker -t my-topic --proto ./my-schema.proto
 ```
 This would consume all the messages from the topic since its start and use default formatting.
 
 You can specify the start and/or the end offset timestamp in milliseconds. Both are optional.
 ```shell
-proton consume -b my-broker -t my-topic -m ./my-schema.proto -s 1646218065015 -e 1646218099197
+proton consume -b my-broker -t my-topic --proto ./my-schema.proto -o s@1646218065015 -o e@1646218099197
 ```
 If the end offset is set, proton will stop consuming once it's reached. Otherwise, it will 
 
 You can specify the format of the output.
 ```shell
-$ proton consume -b my-broker -t my-topic -m ./my-schema.proto -f "Time: %T \t %k\t%s"
+$ proton consume -b my-broker -t my-topic --proto ./my-schema.proto -f "Time: %T \t %k\t%s"
 # ...
 Time: 1646218065015 	 key  {"field1":"value1","field2":"value2"}
 Time: 1646218099197 	 key  {"field1":"value1","field2":"value2"}
