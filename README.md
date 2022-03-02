@@ -64,6 +64,34 @@ Multiple proto files from a producer with input messages piped
 
 ### Usage with Kafka consumers
 
+#### As a standalone consumer
+
+Proton can consume from Kafka directly. The syntax of all the parameters is kept as close as possible to the same from Kafkcat.
+
+The minimal configuration to run Proton as a standalone consumer is
+```shell
+proton consume -b my-broker -t my-topic -m ./my-schema.proto
+```
+This would consume all the messages from the topic since its start and use default formatting.
+
+You can specify the start and/or the end offset timestamp in milliseconds. Both are optional.
+```shell
+proton consume -b my-broker -t my-topic -m ./my-schema.proto -s 1646218065015 -e 1646218099197
+```
+If the end offset is set, proton will stop consuming once it's reached. Otherwise, it will 
+
+You can specify the format of the output.
+```shell
+$ proton consume -b my-broker -t my-topic -m ./my-schema.proto -f "Time: %T \t %k\t%s"
+# ...
+Time: 1646218065015 	 key  {"field1":"value1","field2":"value2"}
+Time: 1646218099197 	 key  {"field1":"value1","field2":"value2"}
+# ... 
+```
+Run `proton consume -h` to see all the available formatting options.
+
+#### Piping from Kafkacat
+
 Because Proto bytes can contain newlines (`\n`) and often do,
 we need to use a different marker to delimit the end of a message byte-stream and the beginning of the next.
 Proton expects an end of message marker, or will read to the end of the stream if not provided.
