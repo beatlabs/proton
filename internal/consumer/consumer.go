@@ -50,7 +50,9 @@ func NewKafka(ctx context.Context, cfg Cfg, decoder protoparser.Decoder, printer
 	config.Version = sarama.V0_11_0_0
 	config.Consumer.IsolationLevel = sarama.ReadCommitted
 
-	fmt.Println("Spinning the wheel... Connecting, gathering partitions data and stuff...")
+	if cfg.Verbose {
+		fmt.Println("Spinning the wheel... Connecting, gathering partitions data and stuff...")
+	}
 
 	url := cfg.URL
 	if !strings.HasSuffix(url, ":9092") {
