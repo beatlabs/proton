@@ -3,14 +3,16 @@ package consumer
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
-	"strings"
 	"sync"
 
 	"github.com/Shopify/sarama"
 	"github.com/beatlabs/proton/v2/internal/output"
 	"github.com/beatlabs/proton/v2/internal/protoparser"
 )
+
+const defaultPort = "9092"
 
 // Cfg is the configuration of this consumer.
 type Cfg struct {
@@ -54,11 +56,17 @@ func NewKafka(ctx context.Context, cfg Cfg, decoder protoparser.Decoder, printer
 		fmt.Println("Spinning the wheel... Connecting, gathering partitions data and stuff...")
 	}
 
-	url := cfg.URL
-	if !strings.HasSuffix(url, ":9092") {
-		url = fmt.Sprintf("%s:9092", url)
+	parsed, err := url.Parse(cfg.URL)
+	if err != nil {
+		return nil, err
 	}
-	client, err := sarama.NewClient([]string{url}, config)
+
+	broker := parsed.String()
+	if parsed.Port() == "" {
+		broker = fmt.Sprintf("%s:%s", broker, defaultPort)
+	}
+
+	client, err := sarama.NewClient([]string{broker}, config)
 	if err != nil {
 		return nil, err
 	}
