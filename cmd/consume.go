@@ -22,35 +22,36 @@ var consumeCmd = &cobra.Command{
 	Run:   Run,
 }
 
-var topic string
-var broker string
-var proto string
-var format string
-var keyGrep string
+// ConsumeCfg is the config for everything this tool needs.
+type ConsumeCfg struct {
+	consumerCfg *consumer.Cfg
+	model       string
+	format      string
+}
 
-//var offsets []string
-var startTime, endTime int64
-var verbose bool
+var consumeCfg = &ConsumeCfg{
+	consumerCfg: &consumer.Cfg{},
+}
 
 func init() {
 	rootCmd.AddCommand(consumeCmd)
 
-	consumeCmd.Flags().StringVarP(&broker, "broker", "b", "", "Broker URL to consume from")
+	consumeCmd.Flags().StringVarP(&consumeCfg.consumerCfg.URL, "broker", "b", "", "Broker URL to consume from")
 	if consumeCmd.MarkFlagRequired("broker") != nil {
 		log.Fatal("you must specify a a broker URL using the `-b <url>` option")
 	}
 
-	consumeCmd.Flags().StringVarP(&topic, "topic", "t", "", "A topic to consume from")
+	consumeCmd.Flags().StringVarP(&consumeCfg.consumerCfg.Topic, "topic", "t", "", "A topic to consume from")
 	if consumeCmd.MarkFlagRequired("topic") != nil {
 		log.Fatal("you must specify a topic to consume using the `-t <topic>` option")
 	}
 
-	consumeCmd.Flags().StringVarP(&proto, "proto", "", "", "A path to a proto file an URL to it")
+	consumeCmd.Flags().StringVarP(&consumeCfg.model, "proto", "", "", "A path to a proto file an URL to it")
 	if consumeCmd.MarkFlagRequired("proto") != nil {
 		log.Fatal("you must specify a proto file using the `-m <path>` option")
 	}
 
-	consumeCmd.Flags().StringVarP(&format, "format", "f", "%T: %s", `
+	consumeCmd.Flags().StringVarP(&consumeCfg.format, "format", "f", "%T: %s", `
 A Kcat-like format string. Defaults to "%T: %s".
 Format string tokens:
 	%s                 Message payload
@@ -77,12 +78,12 @@ Example:
 	*/
 	//consumeCmd.Flags().StringSliceVarP(&offsets, "offsets", "o", []string{}, "Start and end timestamp offsets")
 	//startTime, endTime = parseOffsets(offsets)
-	consumeCmd.Flags().Int64VarP(&startTime, "start", "s", sarama.OffsetOldest, "Start timestamp offset")
-	consumeCmd.Flags().Int64VarP(&endTime, "end", "e", sarama.OffsetNewest, "End timestamp offset")
+	consumeCmd.Flags().Int64VarP(&consumeCfg.consumerCfg.Start, "start", "s", sarama.OffsetOldest, "Start timestamp offset")
+	consumeCmd.Flags().Int64VarP(&consumeCfg.consumerCfg.End, "end", "e", sarama.OffsetNewest, "End timestamp offset")
 
-	consumeCmd.Flags().StringVarP(&keyGrep, "key", "", ".*", "Grep RegExp for a key value")
+	consumeCmd.Flags().StringVarP(&consumeCfg.consumerCfg.KeyGrep, "key", "", ".*", "Grep RegExp for a key value")
 
-	consumeCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Whether to print out proton's debug messages")
+	consumeCmd.Flags().BoolVarP(&consumeCfg.consumerCfg.Verbose, "verbose", "v", false, "Whether to print out proton's debug messages")
 }
 
 //func parseOffsets(offsets []string) (int64, int64) {
@@ -108,22 +109,22 @@ func Run(cmd *cobra.Command, _ []string) {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 
-	protoParser, fileName, err := protoparser.New(ctx, proto)
+	protoParser, fileName, err := protoparser.New(ctx, consumeCfg.model)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	kafka, err := consumer.NewKafka(ctx, consumer.Cfg{
-		URL:     broker,
-		Topic:   topic,
-		Start:   startTime,
-		End:     endTime,
-		Verbose: verbose,
-		KeyGrep: keyGrep,
+		URL:     consumeCfg.consumerCfg.URL,
+		Topic:   consumeCfg.consumerCfg.Topic,
+		Start:   consumeCfg.consumerCfg.Start,
+		End:     consumeCfg.consumerCfg.End,
+		Verbose: consumeCfg.consumerCfg.Verbose,
+		KeyGrep: consumeCfg.consumerCfg.KeyGrep,
 	}, &protoDecoder{json.Converter{
 		Parser:   protoParser,
 		Filename: fileName,
-	}}, output.NewFormatterPrinter(format, os.Stdout, os.Stderr))
+	}}, output.NewFormatterPrinter(consumeCfg.format, os.Stdout, os.Stderr))
 
 	if err != nil {
 		log.Fatal(err)
