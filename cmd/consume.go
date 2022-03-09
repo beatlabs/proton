@@ -71,13 +71,9 @@ Format string tokens:
 Example:
 	-f 'Key: %k, Time: %Tf \nValue: %s'`)
 
-	/*
-			FIXME: kafkacat's syntax allows specifying offsets using an array of `-o` flags.
-		 	Specifying `-o 123 -o 234` doesn't work with Cobra for an unknown reason but it actually should.
-			So before it's fixed, using the non-conventional `-s 123456789` and `-e 234567890`. It should be `-o s@123456789 -o e@234567890` instead.
-	*/
-	//consumeCmd.Flags().StringSliceVarP(&offsets, "offsets", "o", []string{}, "Start and end timestamp offsets")
-	//startTime, endTime = parseOffsets(offsets)
+	// FIXME: kafkacat's syntax allows specifying offsets using an array of `-o` flags.
+	// Specifying `-o 123 -o 234` doesn't work with Cobra for an unknown reason but it actually should.
+	// So before it's fixed, using the non-conventional `-s 123456789` and `-e 234567890`. It should be `-o s@123456789 -o e@234567890` instead.
 	consumeCmd.Flags().Int64VarP(&consumeCfg.consumerCfg.Start, "start", "s", sarama.OffsetOldest, "Start timestamp offset")
 	consumeCmd.Flags().Int64VarP(&consumeCfg.consumerCfg.End, "end", "e", sarama.OffsetNewest, "End timestamp offset")
 
@@ -85,24 +81,6 @@ Example:
 
 	consumeCmd.Flags().BoolVarP(&consumeCfg.consumerCfg.Verbose, "verbose", "v", false, "Whether to print out proton's debug messages")
 }
-
-//func parseOffsets(offsets []string) (int64, int64) {
-//	return parseOffset("s@", offsets, sarama.OffsetOldest), parseOffset("e@", offsets, sarama.OffsetNewest)
-//}
-//
-//func parseOffset(prefix string, offsets []string, defaultVal int64) int64 {
-//	fmt.Println(offsets)
-//
-//	for _, offset := range offsets {
-//		if strings.HasPrefix(offset, prefix) {
-//			v, err := strconv.Atoi(offset[len(prefix):])
-//			if err == nil {
-//				return int64(v)
-//			}
-//		}
-//	}
-//	return defaultVal
-//}
 
 // Run runs this whole thing.
 func Run(cmd *cobra.Command, _ []string) {
