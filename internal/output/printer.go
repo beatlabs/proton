@@ -16,9 +16,10 @@ type Printer interface {
 
 // Msg is the successfully consumed Kafka message with some metadata for it.
 type Msg struct {
-	Key, Value string
-	Topic      string
-	Time       time.Time
+	Key, Value        string
+	Partition, Offset int
+	Topic             string
+	Time              time.Time
 }
 
 // FormattedPrinter is a printer that knows how to parse the Kafkacat's format spec.
@@ -32,6 +33,8 @@ type FormattedPrinter struct {
 // 	%s		Message payload
 //	%k		Message key
 //	%t		Topic
+//	%p		Partition
+//	%o		Offset
 //	%T		Timestamp in milliseconds
 //	%Tf		Timestamp formatted as RFC3339
 //  \n \r 	Newlines
@@ -54,6 +57,8 @@ func (f *FormattedPrinter) Print(msg Msg) {
 	val = strings.ReplaceAll(val, "%s", msg.Value)
 	val = strings.ReplaceAll(val, "%k", msg.Key)
 	val = strings.ReplaceAll(val, "%t", msg.Topic)
+	val = strings.ReplaceAll(val, "%p", fmt.Sprintf("%d", msg.Partition))
+	val = strings.ReplaceAll(val, "%o", fmt.Sprintf("%d", msg.Offset))
 	val = strings.ReplaceAll(val, "%Tf", msg.Time.Format(time.RFC3339))
 	val = strings.ReplaceAll(val, "%T", strconv.Itoa(int(msg.Time.UnixMilli())))
 

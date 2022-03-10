@@ -51,12 +51,14 @@ func init() {
 		log.Fatal("you must specify a proto file using the `-m <path>` option")
 	}
 
-	consumeCmd.Flags().StringVarP(&consumeCfg.format, "format", "f", "%T: %s", `
+	consumeCmd.Flags().StringVarP(&consumeCfg.format, "format", "f", "%Tf: %s", `
 A Kcat-like format string. Defaults to "%T: %s".
 Format string tokens:
 	%s                 Message payload
 	%k                 Message key
 	%t                 Topic
+	%p                 Partition
+	%o                 Offset
 	%T                 Message timestamp (milliseconds since epoch UTC)
 	%Tf                Message time formatted as RFC3339 # this is not supported by kcat
 	\n \r \t           Newlines, tab

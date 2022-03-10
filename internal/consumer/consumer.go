@@ -54,6 +54,7 @@ func NewKafka(ctx context.Context, cfg Cfg, decoder protoparser.Decoder, printer
 
 	if cfg.Verbose {
 		fmt.Println("Spinning the wheel... Connecting, gathering partitions data and stuff...")
+		fmt.Println(fmt.Sprintf("Consuming from %s from timestamp %d until timestamp %d", cfg.Topic, cfg.Start, cfg.End))
 	}
 
 	parsed, err := url.Parse(cfg.URL)
@@ -158,20 +159,20 @@ func (k *Kafka) Run() <-chan error {
 					case <-k.ctx.Done():
 						return
 					case message := <-c.Messages():
-						if !k.keyGrep.Match(message.Key) {
-							continue
-						}
-
-						msg, err := k.decoder.Decode(message.Value)
-						if err == nil {
-							k.printer.Print(output.Msg{
-								Key:   string(message.Key),
-								Value: msg,
-								Topic: topic,
-								Time:  message.Timestamp,
-							})
-						} else {
-							k.printer.PrintErr(err)
+						if k.keyGrep.Match(message.Key) {
+							msg, err := k.decoder.Decode(message.Value)
+							if err == nil {
+								k.printer.Print(output.Msg{
+									Key:       string(message.Key),
+									Value:     msg,
+									Topic:     topic,
+									Partition: int(message.Partition),
+									Offset:    int(message.Offset),
+									Time:      message.Timestamp,
+								})
+							} else {
+								k.printer.PrintErr(err)
+							}
 						}
 
 						if o.end == message.Offset {
