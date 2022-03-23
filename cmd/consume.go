@@ -60,16 +60,8 @@ Format string tokens:
 	%p                 Partition
 	%o                 Offset
 	%T                 Message timestamp (milliseconds since epoch UTC)
-	%Tf                Message time formatted as RFC3339 # this is not supported by kcat
-	\n \r \t           Newlines, tab
-	
-	// [not yet supported] \xXX \xNNN         Any ASCII character
-	// [not yet supported] %S                 Message payload length (or -1 for NULL)
-	// [not yet supported] %R                 Message payload length (or -1 for NULL) serialized as a binary big endian 32-bit signed integer
-	// [not yet supported] %K                 Message key length (or -1 for NULL)
-	// [not yet supported] %h                 Message headers (n=v CSV)	
-	// [not yet supported] %p                 Partition
-	// [not yet supported] %o                 Message offset	
+	%Tf                Message time formatted as RFC3339
+	\n \r \t           Newlines, tab	
 Example:
 	-f 'Key: %k, Time: %Tf \nValue: %s'`)
 
