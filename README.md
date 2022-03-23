@@ -78,7 +78,7 @@ You can specify the start and/or the end offset timestamp in milliseconds. Both 
 ```shell
 proton consume -b my-broker -t my-topic --proto ./my-schema.proto -s 1646218065015 -e 1646218099197
 ```
-If the end offset is set, proton will stop consuming once it's reached. Otherwise, it will 
+If the end offset is set, proton will stop consuming once it's reached. Otherwise, it will keep consuming.
 
 You can specify the format of the output.
 ```shell
