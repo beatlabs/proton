@@ -18,7 +18,7 @@ brew tap beatlabs/proton https://github.com/beatlabs/proton
 brew install proton
 ```
 
-## Usage
+## Usage as a converter Protobuf to JSON
 
 ```shell script
 Usage:
@@ -35,7 +35,7 @@ Flags:
                                        Defaults to the first message type in the Proton file if not specified
 ```
 
-## Examples
+### Examples
 
 Proto file from URL with input message as argument
 ```shell script
@@ -62,11 +62,77 @@ Multiple proto files from a producer with input messages piped
 ./testdata/producer.sh '--END--' | proton json -f ./testdata/addressbook.proto -m '--END--'
 ```
 
-### Usage with Kafka consumers
+### Piping data from Kafkacat
 
-#### As a standalone consumer
+Because Proto bytes can contain newlines (`\n`) and often do,
+we need to use a different marker to delimit the end of a message byte-stream and the beginning of the next.
+Proton expects an end of message marker, or will read to the end of the stream if not provided.
 
-Proton can consume from Kafka directly. The syntax of all the parameters is kept as close as possible to the same from Kafkcat.
+You can add markers at the end of each messae with tools like [kafkacat](https://github.com/edenhill/kcat), like so:
+
+```shell script
+kcat -b my-broker:9092 -t my-topic -f '%s--END--'
+```
+
+You can consume messages and parse them with Proton by doing the following:
+
+```shell script
+kcat -b my-broker:9092 -t my-topic -f '%s--END--' -o beginning | proton json -f ./my-schema.proto -m '--END--'
+```
+
+**Don't see messages?**
+
+If you execute the above command, but you don't see messages until you stop the consumer, you might have to adjust your buffer settings:
+You can do this with the `stdbuf` command.
+
+```shell script
+stdbuf -o0 kcat -b my-broker:9092 -t my-topic -f '%s--END--' -o beginning | proton json -f ./my-schema.proto -m '--END--'
+```
+
+If you don't have `stdbuf`, you can install it via `brew install coreutils`.
+
+## Using proton as a standalone Kafka consumer
+
+Proton can consume from Kafka directly. The syntax of all the parameters is kept as close as possible to the same from Kafkacat.
+
+```shell
+$ proton consume --help
+consume from given topics
+
+Usage:
+  proton consume [flags]
+
+Flags:
+  -b, --broker string   Broker URL to consume from
+  -e, --end int         End timestamp offset (default -1)
+  -f, --format string
+                        A Kcat-like format string. Defaults to "%T: %s".
+                        Format string tokens:
+                        	%s                 Message payload
+                        	%k                 Message key
+                        	%t                 Topic
+                        	%p                 Partition
+                        	%o                 Offset
+                        	%T                 Message timestamp (milliseconds since epoch UTC)
+                        	%Tf                Message time formatted as RFC3339 # this is not supported by kcat
+                        	\n \r \t           Newlines, tab
+
+                        	// [not yet supported] \xXX \xNNN         Any ASCII character
+                        	// [not yet supported] %S                 Message payload length (or -1 for NULL)
+                        	// [not yet supported] %R                 Message payload length (or -1 for NULL) serialized as a binary big endian 32-bit signed integer
+                        	// [not yet supported] %K                 Message key length (or -1 for NULL)
+                        	// [not yet supported] %h                 Message headers (n=v CSV)
+                        	// [not yet supported] %p                 Partition
+                        	// [not yet supported] %o                 Message offset
+                        Example:
+                        	-f 'Key: %k, Time: %Tf \nValue: %s' (default "%Tf: %s")
+  -h, --help            help for consume
+      --key string      Grep RegExp for a key value (default ".*")
+      --proto string    A path to a proto file an URL to it
+  -s, --start int       Start timestamp offset (default -2)
+  -t, --topic string    A topic to consume from
+  -v, --verbose         Whether to print out proton's debug messages
+```
 
 The minimal configuration to run Proton as a standalone consumer is
 ```shell
@@ -96,32 +162,4 @@ proton consume -b my-broker -t my-topic --proto ./my-schema.proto --key "my-key"
 proton consume -b my-broker -t my-topic --proto ./my-schema.proto --key "my-k.*"
 ```
 
-#### Piping from Kafkacat
-
-Because Proto bytes can contain newlines (`\n`) and often do,
-we need to use a different marker to delimit the end of a message byte-stream and the beginning of the next.
-Proton expects an end of message marker, or will read to the end of the stream if not provided.
-
-You can add markers at the end of each messae with tools like [kafkacat](https://github.com/edenhill/kcat), like so:
-
-```shell script
-kcat -b my-broker:9092 -t my-topic -f '%s--END--'
-```
-
-You can consume messages and parse them with Proton by doing the following:
-
-```shell script
-kcat -b my-broker:9092 -t my-topic -f '%s--END--' -o beginning | proton json -f ./my-schema.proto -m '--END--'
-```
-
-**Don't see messages?**
-
-If you execute the above command, but you don't see messages until you stop the consumer, you might have to adjust your buffer settings:
-You can do this with the `stdbuf` command.
-
-```shell script
-stdbuf -o0 kcat -b my-broker:9092 -t my-topic -f '%s--END--' -o beginning | proton json -f ./my-schema.proto -m '--END--'
-```
-
-If you don't have `stdbuf`, you can install it via `brew install coreutils`.
 
