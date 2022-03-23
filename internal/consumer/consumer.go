@@ -159,21 +159,7 @@ func (k *Kafka) Run() <-chan error {
 					case <-k.ctx.Done():
 						return
 					case message := <-c.Messages():
-						if k.keyGrep.Match(message.Key) {
-							msg, err := k.decoder.Decode(message.Value)
-							if err == nil {
-								k.printer.Print(output.Msg{
-									Key:       string(message.Key),
-									Value:     msg,
-									Topic:     topic,
-									Partition: int(message.Partition),
-									Offset:    int(message.Offset),
-									Time:      message.Timestamp,
-								})
-							} else {
-								k.printer.PrintErr(err)
-							}
-						}
+						k.processMessage(message)
 
 						if o.end == message.Offset {
 							k.log(fmt.Sprintf("# Reached stop timestamp for topic %s: exiting", offsetMsg(topic, o.partition, o.end)))
@@ -193,6 +179,24 @@ func (k *Kafka) Run() <-chan error {
 	}()
 
 	return errCh
+}
+
+func (k *Kafka) processMessage(message *sarama.ConsumerMessage) {
+	if k.keyGrep.Match(message.Key) {
+		msg, err := k.decoder.Decode(message.Value)
+		if err == nil {
+			k.printer.Print(output.Msg{
+				Key:       string(message.Key),
+				Value:     msg,
+				Topic:     message.Topic,
+				Partition: int(message.Partition),
+				Offset:    int(message.Offset),
+				Time:      message.Timestamp,
+			})
+		} else {
+			k.printer.PrintErr(err)
+		}
+	}
 }
 
 func offsetMsg(topic string, partition int32, offset int64) string {
