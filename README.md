@@ -103,27 +103,30 @@ Usage:
   proton consume [flags]
 
 Flags:
-  -b, --broker string   Broker URL to consume from
-  -e, --end int         End timestamp offset (default -1)
+  -b, --broker string     Broker URL to consume from
   -f, --format string
-                        A Kcat-like format string. Defaults to "%T: %s".
-                        Format string tokens:
-                        	%s                 Message payload
-                        	%k                 Message key
-                        	%t                 Topic
-                        	%p                 Partition
-                        	%o                 Offset
-                        	%T                 Message timestamp (milliseconds since epoch UTC)
-                        	%Tf                Message time formatted as RFC3339 # this is not supported by kcat
-                        	\n \r \t           Newlines, tab
-                        Example:
-                        	-f 'Key: %k, Time: %Tf \nValue: %s' (default "%Tf: %s")
-  -h, --help            help for consume
-      --key string      Grep RegExp for a key value (default ".*")
-      --proto string    A path to a proto file an URL to it
-  -s, --start int       Start timestamp offset (default -2)
-  -t, --topic string    A topic to consume from
-  -v, --verbose         Whether to print out proton's debug messages
+                          A Kcat-like format string. Defaults to "%T: %s".
+                          Format string tokens:
+                          	%s                 Message payload
+                          	%k                 Message key
+                          	%t                 Topic
+                          	%p                 Partition
+                          	%o                 Offset
+                          	%T                 Message timestamp (milliseconds since epoch UTC)
+                          	%Tf                Message time formatted as RFC3339
+                          	\n \r \t           Newlines, tab
+                          Example:
+                          	-f 'Key: %k, Time: %Tf \nValue: %s' (default "%Tf: %s")
+  -h, --help              help for consume
+      --key string        Grep RegExp for a key value (default ".*")
+  -o, --offsets strings
+                          Offset to start consuming from
+                          	 s@<value> (timestamp in ms to start at)
+                          	 e@<value> (timestamp in ms to stop at (not included))
+
+      --proto string      A path to a proto file an URL to it
+  -t, --topic string      A topic to consume from
+  -v, --verbose           Whether to print out proton's debug messages
 ```
 
 The minimal configuration to run Proton as a standalone consumer is
@@ -134,7 +137,7 @@ This would consume all the messages from the topic since its start and use defau
 
 You can specify the start and/or the end offset timestamp in milliseconds. Both are optional.
 ```shell
-proton consume -b my-broker -t my-topic --proto ./my-schema.proto -s 1646218065015 -e 1646218099197
+proton consume -b my-broker -t my-topic --proto ./my-schema.proto -o s@1646218065015 -o e@1646218099197
 ```
 If the end offset is set, proton will stop consuming once it's reached. Otherwise, it will keep consuming.
 

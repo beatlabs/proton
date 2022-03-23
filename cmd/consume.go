@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 
 	"github.com/Shopify/sarama"
 	"github.com/beatlabs/proton/v2/internal/consumer"
@@ -24,13 +26,14 @@ var consumeCmd = &cobra.Command{
 
 // ConsumeCfg is the config for everything this tool needs.
 type ConsumeCfg struct {
-	consumerCfg *consumer.Cfg
+	consumerCfg consumer.Cfg
+	offsets     []string
 	model       string
 	format      string
 }
 
 var consumeCfg = &ConsumeCfg{
-	consumerCfg: &consumer.Cfg{},
+	consumerCfg: consumer.Cfg{},
 }
 
 func init() {
@@ -61,15 +64,15 @@ Format string tokens:
 	%o                 Offset
 	%T                 Message timestamp (milliseconds since epoch UTC)
 	%Tf                Message time formatted as RFC3339
-	\n \r \t           Newlines, tab	
+	\n \r \t           Newlines, tab
 Example:
 	-f 'Key: %k, Time: %Tf \nValue: %s'`)
 
-	// FIXME: kafkacat's syntax allows specifying offsets using an array of `-o` flags.
-	// Specifying `-o 123 -o 234` doesn't work with Cobra for an unknown reason but it actually should.
-	// So before it's fixed, using the non-conventional `-s 123456789` and `-e 234567890`. It should be `-o s@123456789 -o e@234567890` instead.
-	consumeCmd.Flags().Int64VarP(&consumeCfg.consumerCfg.Start, "start", "s", sarama.OffsetOldest, "Start timestamp offset")
-	consumeCmd.Flags().Int64VarP(&consumeCfg.consumerCfg.End, "end", "e", sarama.OffsetNewest, "End timestamp offset")
+	consumeCmd.Flags().StringSliceVarP(&consumeCfg.offsets, "offsets", "o", []string{}, `
+Offset to start consuming from
+	 s@<value> (timestamp in ms to start at)
+	 e@<value> (timestamp in ms to stop at (not included))
+`)
 
 	consumeCmd.Flags().StringVarP(&consumeCfg.consumerCfg.KeyGrep, "key", "", ".*", "Grep RegExp for a key value")
 
@@ -86,17 +89,13 @@ func Run(cmd *cobra.Command, _ []string) {
 		log.Fatal(err)
 	}
 
-	kafka, err := consumer.NewKafka(ctx, consumer.Cfg{
-		URL:     consumeCfg.consumerCfg.URL,
-		Topic:   consumeCfg.consumerCfg.Topic,
-		Start:   consumeCfg.consumerCfg.Start,
-		End:     consumeCfg.consumerCfg.End,
-		Verbose: consumeCfg.consumerCfg.Verbose,
-		KeyGrep: consumeCfg.consumerCfg.KeyGrep,
-	}, &protoDecoder{json.Converter{
-		Parser:   protoParser,
-		Filename: fileName,
-	}}, output.NewFormatterPrinter(consumeCfg.format, os.Stdout, os.Stderr))
+	consumeCfg.consumerCfg.Start, consumeCfg.consumerCfg.End = parseOffsets(consumeCfg.offsets)
+
+	kafka, err := consumer.NewKafka(ctx, consumeCfg.consumerCfg,
+		&protoDecoder{json.Converter{
+			Parser:   protoParser,
+			Filename: fileName,
+		}}, output.NewFormatterPrinter(consumeCfg.format, os.Stdout, os.Stderr))
 
 	if err != nil {
 		log.Fatal(err)
@@ -130,4 +129,20 @@ func (p *protoDecoder) Decode(rawData []byte) (string, error) {
 	case err := <-errCh:
 		return "", err
 	}
+}
+
+func parseOffsets(offsets []string) (int64, int64) {
+	return parseOffset("s@", offsets, sarama.OffsetOldest), parseOffset("e@", offsets, sarama.OffsetNewest)
+}
+
+func parseOffset(prefix string, offsets []string, defaultVal int64) int64 {
+	for _, offset := range offsets {
+		if strings.HasPrefix(offset, prefix) {
+			v, err := strconv.Atoi(offset[len(prefix):])
+			if err == nil {
+				return int64(v)
+			}
+		}
+	}
+	return defaultVal
 }
