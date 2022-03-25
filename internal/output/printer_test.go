@@ -3,6 +3,7 @@ package output
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 func TestPrint(t *testing.T) {
 	currentTime := time.Unix(42, 123)
+	timeFormatted := currentTime.Format(time.RFC3339)
 
 	tests := []struct {
 		name     string
@@ -27,7 +29,7 @@ func TestPrint(t *testing.T) {
 				Topic: "my-topic",
 				Time:  currentTime,
 			},
-			expected: "Topic: my-topic, Key: my-key, \n\rMsg: my-val, \tTimestamp: 42000, Time: 1970-01-01T01:00:42+01:00\n",
+			expected: fmt.Sprintf("Topic: my-topic, Key: my-key, \n\rMsg: my-val, \tTimestamp: 42000, Time: %s\n", timeFormatted),
 		},
 	}
 	for _, test := range tests {
