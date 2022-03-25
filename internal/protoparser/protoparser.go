@@ -11,6 +11,25 @@ import (
 	"github.com/jhump/protoreflect/desc/protoparse"
 )
 
+// Decoder is the interface that accepts bytes from Proto message and decodes it to a string.
+type Decoder interface {
+	Decode([]byte) (string, error)
+}
+
+// New initializes a proto parser.
+func New(ctx context.Context, path string) (protoparse.Parser, string, error) {
+	u, err := url.Parse(path)
+	if err != nil {
+		return protoparse.Parser{}, path, err
+	}
+
+	if u.Scheme == "" {
+		return NewFile(u.String())
+	}
+
+	return NewHTTP(ctx, u)
+}
+
 // NewFile initializes a proto parser from a local proto file.
 func NewFile(filePath string) (protoparse.Parser, string, error) {
 	abs, err := fp.Abs(fp.Clean(filePath))
